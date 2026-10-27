@@ -6,7 +6,7 @@ import Icon from '../components/ui/Icon'
 import { Modal } from '../components/ui/Overlay'
 import { Spinner } from '../components/auth/AuthLayout'
 import { useToast } from '../components/ui/Toast'
-import { declineDocument, getSigning, getSigningDocument, signDocument } from '../services/signingService'
+import { approveDocument, declineDocument, getSigning, getSigningDocument, signDocument } from '../services/signingService'
 import { saveBlob } from '../services/contractService'
 import { formatDateTime } from '../utils/format'
 
@@ -17,6 +17,7 @@ const SIGNED_COLOR = '#16a34a'
 /*
  * Public page a signer reaches from the emailed link (/sign/:token).
  * They review the PDF, adopt a signature (drawn or typed), agree, and finish.
+ * Reviewers get the same page without signing: they approve (with an optional comment) or reject.
  */
 export default function SignDocument() {
   const { token } = useParams()
@@ -31,6 +32,7 @@ export default function SignDocument() {
   const [declineOpen, setDeclineOpen] = useState(false)
   const [reason, setReason] = useState('')
   const [justSigned, setJustSigned] = useState(false)
+  const [comment, setComment] = useState('')
 
   const loadDocument = () =>
     getSigningDocument(token)
@@ -92,7 +94,9 @@ export default function SignDocument() {
   }
 
   const { contract, me, canSign } = view
-  const signedCount = view.signers.filter((s) => s.status === 'signed').length
+  const isReviewer = me.kind === 'reviewer'
+  const hasReviewers = view.signers.some((s) => s.kind === 'reviewer')
+  const doneCount = view.signers.filter((s) => s.status === 'signed').length
 
   const renderBox = (b) => {
     if (b.mine && b.signed) return <img src={view.signatures[me.order]} alt="Your signature" className="sign-box-img" />
@@ -116,6 +120,18 @@ export default function SignDocument() {
       setView(next)
       setJustSigned(true)
       if (next.contract.status === 'completed') loadDocument()
+    } catch (err) {
+      toast(err.message, 'error')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const approve = async () => {
+    setBusy(true)
+    try {
+      setView(await approveDocument(token, comment.trim()))
+      setJustSigned(true)
     } catch (err) {
       toast(err.message, 'error')
     } finally {
@@ -155,7 +171,32 @@ export default function SignDocument() {
         <aside className="sign-side">
           <StatusCard view={view} justSigned={justSigned} onDownload={download} />
 
-          {canSign && (
+          {canSign && isReviewer && (
+            <div className="card pad sign-steps">
+              <h3>Review this document</h3>
+              <p className="muted small">Read the document on the left. Approving sends it on to the signers; rejecting stops it and tells the sender why.</p>
+              <label className="field">
+                <span className="field-label">Comment (optional, shared with the sender)</span>
+                <textarea rows={3} value={comment} maxLength={1000} onChange={(e) => setComment(e.target.value)} placeholder="e.g. Checked the loan amount and terms" />
+              </label>
+              <button className="btn primary block" disabled={busy} onClick={approve}>
+                {busy ? (
+                  <>
+                    <Spinner /> Approving…
+                  </>
+                ) : (
+                  <>
+                    <Icon name="check" size={16} /> Approve document
+                  </>
+                )}
+              </button>
+              <button className="btn ghost block sign-decline" onClick={() => setDeclineOpen(true)} disabled={busy}>
+                Reject
+              </button>
+            </div>
+          )}
+
+          {canSign && !isReviewer && (
             <div className="card pad sign-steps">
               <h3>Sign this document</h3>
               <ol className="sign-step-list">
@@ -202,7 +243,10 @@ export default function SignDocument() {
 
           <div className="card pad">
             <h3 className="sign-side-title">
-              Signers <span className="muted small">{signedCount} of {view.signers.length} signed</span>
+              {hasReviewers ? 'Reviewers & signers' : 'Signers'}{' '}
+              <span className="muted small">
+                {doneCount} of {view.signers.length} {hasReviewers ? 'done' : 'signed'}
+              </span>
             </h3>
             <ul className="signer-progress">
               {view.signers.map((s) => (
@@ -211,16 +255,18 @@ export default function SignDocument() {
                   <div>
                     <strong>
                       {s.name}
+                      {s.kind === 'reviewer' && <span className="chip muted-chip">Reviewer</span>}
                       {s.order === me.order && <span className="chip">You</span>}
                     </strong>
                     <span className="muted small">
-                      {s.status === 'signed' ? `Signed ${formatDateTime(s.signedAt)}` : s.status === 'declined' ? 'Declined' : 'Not signed yet'}
+                      {personStatus(s)}
                     </span>
                   </div>
                 </li>
               ))}
             </ul>
             <p className="muted small sign-order-note">
+              {hasReviewers && 'Reviewers approve first, then the signers are asked. '}
               {contract.signingMethod === 'parallel' ? 'Everyone can sign in any order.' : 'Signers are asked one after another, in this order.'}
             </p>
           </div>
@@ -240,7 +286,7 @@ export default function SignDocument() {
       <Modal
         open={declineOpen}
         onClose={() => setDeclineOpen(false)}
-        title="Decline to sign?"
+        title={isReviewer ? 'Reject this document?' : 'Decline to sign?'}
         subtitle="The sender will be notified and nobody else will be asked to sign this document."
         footer={
           <>
@@ -248,7 +294,7 @@ export default function SignDocument() {
               Go back
             </button>
             <button className="btn danger" onClick={decline} disabled={!reason.trim() || busy}>
-              {busy ? 'Declining…' : 'Decline'}
+              {busy ? (isReviewer ? 'Rejecting…' : 'Declining…') : isReviewer ? 'Reject' : 'Decline'}
             </button>
           </>
         }
@@ -262,18 +308,34 @@ export default function SignDocument() {
   )
 }
 
+function personStatus(s) {
+  const reviewer = s.kind === 'reviewer'
+  if (s.status === 'signed') return `${reviewer ? 'Approved' : 'Signed'} ${formatDateTime(s.signedAt)}`
+  if (s.status === 'declined') return reviewer ? 'Rejected' : 'Declined'
+  return reviewer ? 'Not reviewed yet' : 'Not signed yet'
+}
+
 function StatusCard({ view, justSigned, onDownload }) {
   const { contract, me, blockedReason } = view
+  const reviewer = me.kind === 'reviewer'
+  const from = `${contract.sender ? `${contract.sender} from ` : ''}${contract.organisation}`
   let tone = 'info'
   let icon = 'file'
-  let title = 'Ready for your signature'
-  let text = `${contract.sender ? `${contract.sender} from ` : ''}${contract.organisation} asked you to sign this document before ${formatDateTime(contract.expiresAt)}.`
+  let title = reviewer ? 'Ready for your review' : 'Ready for your signature'
+  let text = reviewer
+    ? `${from} asked you to review and approve this document before it is sent for signing (by ${formatDateTime(contract.expiresAt)}).`
+    : `${from} asked you to sign this document before ${formatDateTime(contract.expiresAt)}.`
 
   if (contract.status === 'completed') {
     tone = 'green'
     icon = 'checkCircle'
     title = justSigned ? 'All done! Everyone has signed' : 'This document is fully signed'
     text = 'The signed PDF, with its certificate of completion, has been emailed to all signers. You can also download it here.'
+  } else if (me.status === 'signed' && reviewer) {
+    tone = 'green'
+    icon = 'checkCircle'
+    title = justSigned ? 'Thank you, you have approved it' : 'You approved this document'
+    text = "It goes to the signers once every reviewer has approved. We'll email you the completed PDF once everyone has signed."
   } else if (me.status === 'signed') {
     tone = 'green'
     icon = 'checkCircle'
@@ -282,12 +344,12 @@ function StatusCard({ view, justSigned, onDownload }) {
   } else if (me.status === 'declined') {
     tone = 'red'
     icon = 'xCircle'
-    title = 'You declined this document'
+    title = reviewer ? 'You rejected this document' : 'You declined this document'
     text = 'The sender has been notified.'
   } else if (blockedReason) {
     tone = contract.status === 'incomplete' ? 'yellow' : 'red'
     icon = contract.status === 'incomplete' ? 'hourglass' : 'alert'
-    title = contract.status === 'incomplete' ? 'Not your turn yet' : 'Signing is closed'
+    title = contract.status === 'incomplete' ? 'Not your turn yet' : reviewer ? 'Review is closed' : 'Signing is closed'
     text = blockedReason
   }
 

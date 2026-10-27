@@ -15,4 +15,8 @@ export async function getSigningDocument(token) {
 export const signDocument = (token, { signature, type }) =>
   api(`${base(token)}/sign`, { method: 'POST', body: { signature, type, consent: true } })
 
+// Reviewers only: approves the document (comment is optional); signers are invited once every reviewer approves
+export const approveDocument = (token, comment) => api(`${base(token)}/approve`, { method: 'POST', body: { comment } })
+
+// A reviewer's decline is a rejection
 export const declineDocument = (token, reason) => api(`${base(token)}/decline`, { method: 'POST', body: { reason } })

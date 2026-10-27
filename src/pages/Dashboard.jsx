@@ -31,6 +31,9 @@ function rangeBounds(range, custom) {
   return [start, end]
 }
 
+// Contracts list reviewers with the signers; these columns are about signing
+const signersOf = (c) => c.signers.filter((s) => s.kind !== 'reviewer')
+
 const SORTERS = {
   name: (a, b) => a.name.localeCompare(b.name),
   createdAt: (a, b) => new Date(a.createdAt) - new Date(b.createdAt),
@@ -66,7 +69,8 @@ export default function Dashboard() {
   }, [contracts, range, custom])
 
   const count = (status) => inRange.filter((c) => c.status === status).length
-  const signatures = inRange.flatMap((c) => c.signers.filter((s) => s.signed))
+  // Reviewers' approvals are not signatures
+  const signatures = inRange.flatMap((c) => c.signers.filter((s) => s.signed && s.kind !== 'reviewer'))
   const sigCount = (method) => signatures.filter((s) => s.method === method).length
 
   const listed = inRange
@@ -212,10 +216,14 @@ export default function Dashboard() {
                     <td>{formatDateTime(c.createdAt)}</td>
                     <td>{formatDateTime(c.expiresAt)}</td>
                     <td>{c.estamping}</td>
-                    <td>{c.signers.length}</td>
+                    <td>{signersOf(c).length}</td>
                     <td>
                       <span className={`badge ${st.tone}`}>
-                        {c.status === 'incomplete' ? `${c.signers.filter((s) => s.signed).length}/${c.signers.length} signed` : st.label}
+                        {c.status !== 'incomplete'
+                          ? st.label
+                          : c.signers.some((s) => s.kind === 'reviewer' && !s.signed)
+                            ? 'In review'
+                            : `${signersOf(c).filter((s) => s.signed).length}/${signersOf(c).length} signed`}
                       </span>
                     </td>
                   </tr>

@@ -11,14 +11,15 @@ import Table from '@tiptap/extension-table'
 import TableRow from '@tiptap/extension-table-row'
 import TableCell from '@tiptap/extension-table-cell'
 import TableHeader from '@tiptap/extension-table-header'
-import Image from '@tiptap/extension-image'
 import Link from '@tiptap/extension-link'
 import Subscript from '@tiptap/extension-subscript'
 import Superscript from '@tiptap/extension-superscript'
 import Placeholder from '@tiptap/extension-placeholder'
 import Icon from '../ui/Icon'
-import { FontSize, LineHeight, MergeField, PageBreak, SignatureBlock } from './extensions'
+import { Spinner } from '../auth/AuthLayout'
+import { FontSize, IMAGE_LAYOUTS, LineHeight, MergeField, PageBreak, ResizableImage, SignatureBlock } from './extensions'
 import { MARGINS, PAGE_SIZES, pageGeometry } from './pageSetup'
+import { TRANSLATE_LANGUAGES, translateDocument } from './translate'
 
 const FONTS = ['Calibri', 'Arial', 'Times New Roman', 'Georgia', 'Garamond', 'Verdana', 'Tahoma', 'Courier New']
 const SIZES = [8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 32, 36, 48, 72]
@@ -48,7 +49,7 @@ export default function DocEditor({ content, onChange, pageSetup, onPageSetupCha
       TableRow,
       TableHeader,
       TableCell,
-      Image.configure({ allowBase64: true }),
+      ResizableImage.configure({ inline: true, allowBase64: true }),
       Link.configure({ openOnClick: false }),
       Subscript,
       Superscript,
@@ -77,6 +78,14 @@ export default function DocEditor({ content, onChange, pageSetup, onPageSetupCha
   useEffect(() => {
     if (!inTable && tab === 'table') setTab('home')
   }, [inTable, tab])
+
+  // Selecting a picture opens the Picture tab, like Word's Picture Format.
+  const onImage = editor?.isActive('image')
+  useEffect(() => {
+    if (onImage) setTab('picture')
+    else if (tab === 'picture') setTab('home')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onImage])
 
   if (!editor) return null
   const chain = () => editor.chain().focus()
@@ -109,7 +118,11 @@ export default function DocEditor({ content, onChange, pageSetup, onPageSetupCha
     if (!file) return
     if (file.size > MAX_IMAGE_BYTES) return window.alert('Please use an image smaller than 1 MB.')
     const reader = new FileReader()
-    reader.onload = () => chain().setImage({ src: reader.result, alt: file.name }).run()
+    // Select the new picture so its handles and the Picture tab show straight away
+    reader.onload = () => {
+      chain().setImage({ src: reader.result, alt: file.name }).run()
+      editor.commands.setNodeSelection(editor.state.selection.from - 1)
+    }
     reader.readAsDataURL(file)
   }
 
@@ -131,11 +144,17 @@ export default function DocEditor({ content, onChange, pageSetup, onPageSetupCha
             ['home', 'Home'],
             ['insert', 'Insert'],
             ['layout', 'Layout'],
+            ['review', 'Review'],
           ].map(([id, label]) => (
             <button key={id} role="tab" aria-selected={tab === id} className={tab === id ? 'on' : ''} onClick={() => setTab(id)}>
               {label}
             </button>
           ))}
+          {onImage && (
+            <button role="tab" aria-selected={tab === 'picture'} className={`contextual ${tab === 'picture' ? 'on' : ''}`}onClick={() => setTab('picture')}>
+              Picture
+            </button>
+          )}
           {inTable && (
             <button role="tab" aria-selected={tab === 'table'} className={`contextual ${tab === 'table' ? 'on' : ''}`} onClick={() => setTab('table')}>
               Table
@@ -334,6 +353,10 @@ export default function DocEditor({ content, onChange, pageSetup, onPageSetupCha
             </>
           )}
 
+          {tab === 'review' && <TranslateGroup editor={editor} />}
+
+          {tab === 'picture' && onImage && <PictureGroups editor={editor} maxWidth={g.width - g.side * 2} />}
+
           {tab === 'table' && inTable && (
             <>
               <Group label="Rows">
@@ -392,6 +415,211 @@ export default function DocEditor({ content, onChange, pageSetup, onPageSetupCha
         </div>
       </div>
     </div>
+  )
+}
+
+// Small diagrams for the wrap options: a picture block among lines of text
+function LayoutIcon({ layout }) {
+  const line = (x, y, w) => <rect key={`${x}-${y}`} x={x} y={y} width={w} height="1.6" rx="0.8" fill="currentColor" opacity="0.55" />
+  const pic = { inline: [8, 9, 7, 6], left: [2, 6, 8, 8], right: [14, 6, 8, 8], center: [7, 6, 10, 8], free: [9, 7, 11, 9] }[layout]
+  const lines = {
+    free: [line(2, 3, 20), line(2, 8, 20), line(2, 13, 20), line(2, 18, 20)],
+    inline: [line(2, 3, 20), line(2, 13, 5), line(16, 13, 6), line(2, 18, 20)],
+    left: [line(2, 2.5, 20), line(12, 7, 10), line(12, 11, 10), line(2, 17, 20), line(2, 21, 14)],
+    right: [line(2, 2.5, 20), line(2, 7, 10), line(2, 11, 10), line(2, 17, 20), line(2, 21, 14)],
+    center: [line(2, 2.5, 20), line(2, 17, 20), line(2, 21, 14)],
+  }[layout]
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">
+      {lines}
+      <rect
+        x={pic[0]}
+        y={pic[1]}
+        width={pic[2]}
+        height={pic[3]}
+        rx="1"
+        fill={layout === 'free' ? 'var(--surface, #fff)' : 'none'}
+        stroke="currentColor"
+        strokeWidth="1.6"
+      />
+    </svg>
+  )
+}
+
+// Picture tab: size, text wrapping and alt text for the selected picture
+function PictureGroups({ editor, maxWidth }) {
+  const { selection } = editor.state
+  const attrs = editor.getAttributes('image')
+  const imgEl = editor.view.nodeDOM(selection.from)?.querySelector?.('img')
+  const natural = imgEl?.naturalWidth ? { w: imgEl.naturalWidth, h: imgEl.naturalHeight } : null
+  const shownWidth = attrs.width ?? (imgEl ? Math.round(imgEl.offsetWidth) : '')
+  const ratio = natural ? natural.h / natural.w : null
+  const [draft, setDraft] = useState(null) // { field, value } while typing
+
+  // Re-select the picture afterwards: replacing its attributes would otherwise drop the selection
+  const set = (patch) => editor.chain().focus().updateAttributes('image', patch).setNodeSelection(selection.from).run()
+  const setWidth = (w) => set({ width: Math.round(Math.min(maxWidth, Math.max(24, w))) })
+  const commit = () => {
+    if (!draft) return
+    const n = Number(draft.value)
+    setDraft(null)
+    if (!n || n <= 0) return
+    setWidth(draft.field === 'h' && ratio ? n / ratio : n)
+  }
+  const field = (name, value) => (
+    <input
+      type="number"
+      min="1"
+      className="rb-input"
+      value={draft?.field === name ? draft.value : value}
+      onChange={(e) => setDraft({ field: name, value: e.target.value })}
+      onBlur={commit}
+      onKeyDown={(e) => e.key === 'Enter' && commit()}
+      aria-label={name === 'w' ? 'Width in pixels' : 'Height in pixels'}
+      disabled={name === 'h' && !ratio}
+    />
+  )
+
+  return (
+    <>
+      <Group label="Size">
+        <div className="pic-size">
+          <label>
+            Width {field('w', shownWidth)}
+          </label>
+          <label>
+            Height {field('h', ratio && shownWidth ? Math.round(shownWidth * ratio) : '')}
+          </label>
+        </div>
+        <div className="pic-presets">
+          {[25, 50, 75, 100].map((p) => (
+            <RBtn key={p} label={`${p}%`} title={`${p}% of the page width`}onClick={() => setWidth((maxWidth * p) / 100)} />
+          ))}
+          <RBtn label="Original" title="Reset to the picture's original size" onClick={() => set({ width: null })} />
+        </div>
+      </Group>
+      <Group label="Wrap Text">
+        {Object.entries(IMAGE_LAYOUTS).map(([id, l]) => (
+          <button
+            key={id}
+            type="button"
+            className={`rb-btn big ${attrs.layout === id ? 'on' : ''}`}
+            title={l.label}
+            aria-label={l.label}
+            aria-pressed={attrs.layout === id}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => editor.chain().focus().setImageLayout(id).run()}
+          >
+            <LayoutIcon layout={id} />
+            <span>{{ inline: 'In line', left: 'Left', right: 'Right', center: 'Center', free: 'Free' }[id]}</span>
+          </button>
+        ))}
+      </Group>
+      <Group label="Picture">
+        <RBtn
+          big
+          icon="type"
+          label="Alt Text"
+          title="Describe the picture for screen readers"
+          onClick={() => {
+            const alt = window.prompt('Alt text (describes the picture)', attrs.alt ?? '')
+            if (alt !== null) set({ alt: alt.trim() })
+          }}
+        />
+        <RBtn big icon="trash" label="Delete" danger onClick={() => editor.chain().focus().deleteSelection().run()} />
+      </Group>
+      <div className="translate-note">
+        {attrs.layout === 'free'
+          ? 'Drag the picture anywhere on the page, or nudge it with the arrow keys (Shift for bigger steps). Drag a corner to resize.'
+          : 'Drag a corner to resize. Choose Free to drag the picture anywhere on the page, or Left / Right to wrap text around it.'}
+      </div>
+    </>
+  )
+}
+
+const LANG_KEY = 'esign_translate_lang'
+
+// Review > Translate: translates the selection, or the whole document when nothing is selected
+function TranslateGroup({ editor }) {
+  const [lang, setLang] = useState(() => {
+    try {
+      return localStorage.getItem(LANG_KEY) || 'hi'
+    } catch {
+      return 'hi'
+    }
+  })
+  const [busy, setBusy] = useState(false)
+  const [progress, setProgress] = useState('')
+  const [message, setMessage] = useState(null) // { tone, text }
+  const hasSelection = !editor.state.selection.empty
+  const langLabel = TRANSLATE_LANGUAGES.find((l) => l.code === lang)?.label.replace(/\s*\(.*\)$/, '') ?? lang
+
+  const pick = (code) => {
+    setLang(code)
+    try {
+      localStorage.setItem(LANG_KEY, code)
+    } catch {
+      // not remembered, that's fine
+    }
+  }
+
+  const run = async () => {
+    setBusy(true)
+    setMessage(null)
+    setProgress('Preparing…')
+    try {
+      const { pieces, scope, provider } = await translateDocument(editor, lang, setProgress)
+      setMessage(
+        pieces
+          ? {
+              tone: 'ok',
+              text: `Translated the ${scope} to ${langLabel}${provider === 'device' ? ' on this device' : ''}. Press Ctrl+Z to undo.`,
+            }
+          : { tone: 'warn', text: 'There is no text to translate here.' },
+      )
+    } catch (err) {
+      setMessage({ tone: 'error', text: err.message })
+    } finally {
+      setBusy(false)
+      setProgress('')
+    }
+  }
+
+  return (
+    <>
+      <Group label="Language">
+        <div className="translate-controls">
+          <label className="translate-select">
+            <Icon name="languages" size={16} />
+            <select value={lang} onChange={(e) => pick(e.target.value)} disabled={busy} aria-label="Translate to">
+              {TRANSLATE_LANGUAGES.map((l) => (
+                <option key={l.code} value={l.code}>
+                  {l.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button type="button" className="btn primary sm" onMouseDown={(e) => e.preventDefault()} onClick={run} disabled={busy}>
+            {busy ? (
+              <>
+                <Spinner size={14} /> Translating…
+              </>
+            ) : (
+              <>
+                <Icon name="languages" size={14} /> {hasSelection ? 'Translate selection' : 'Translate document'}
+              </>
+            )}
+          </button>
+        </div>
+      </Group>
+      <div className={`translate-note ${message?.tone ?? ''}`}>
+        {(busy && progress) ||
+          message?.text ||
+          (hasSelection
+            ? `Only the selected text will be translated to ${langLabel}.`
+            : `Translates every word into ${langLabel}. Select text first to translate just that part. Merge fields and signature blocks stay as they are.`)}
+      </div>
+    </>
   )
 }
 

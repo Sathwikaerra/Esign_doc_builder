@@ -4,11 +4,13 @@ import { api } from './api'
 export const listContracts = () => api('/contracts')
 export const getContract = (id) => api(`/contracts/${id}`)
 
-// signers: [{ name, email }] in the workflow's signing order. Emails the first invitation(s).
-export const initiateContract = (workflow, signers) =>
+// signers / reviewers: [{ name, email }] in the workflow's order. Emails the first invitation(s):
+// reviewers first, signers once every reviewer has approved.
+const people = (list = []) => list.map(({ name, email }) => ({ name, email }))
+export const initiateContract = (workflow, signers, reviewers = []) =>
   api('/contracts', {
     method: 'POST',
-    body: { workflowId: workflow.id, signers: signers.map(({ name, email }) => ({ name, email })) },
+    body: { workflowId: workflow.id, signers: people(signers), reviewers: people(reviewers) },
   })
 
 // Emails the signer a fresh link (their previous link stops working) and returns { link, emailed, error }

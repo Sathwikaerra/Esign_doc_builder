@@ -27,8 +27,9 @@ export function DocThumb({ html, pageSetup, width = 220 }) {
       <div
         className="doc-thumb-page doc-content"
         style={{ width: g.width, height: g.height, padding: `${g.top}px ${g.side}px`, transform: `scale(${scale})` }}
-        dangerouslySetInnerHTML={{ __html: html || '' }}
-      />
+      >
+        <div className="doc-thumb-body" dangerouslySetInnerHTML={{ __html: html || '' }} />
+      </div>
     </div>
   )
 }

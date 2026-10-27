@@ -16,6 +16,8 @@ const SIGNER_STATUS = {
   signed: { label: 'Signed', tone: 'green' },
   declined: { label: 'Declined', tone: 'red' },
 }
+// Reviewers approve or reject instead of signing or declining
+const REVIEWER_STATUS = { ...SIGNER_STATUS, signed: { label: 'Approved', tone: 'green' }, declined: { label: 'Rejected', tone: 'red' } }
 
 const EVENT_LABELS = {
   created: 'Contract created',
@@ -24,6 +26,8 @@ const EVENT_LABELS = {
   viewed: 'Opened the document',
   signed: 'Signed',
   declined: 'Declined',
+  approved: 'Approved',
+  rejected: 'Rejected',
   completed: 'Completed',
   cancelled: 'Cancelled',
 }
@@ -61,11 +65,17 @@ export default function ContractDetail() {
 
   const status = CONTRACT_STATUS[contract.status] ?? { label: contract.status, tone: 'grey' }
   const open = contract.status === 'incomplete'
-  const signedCount = contract.signers.filter((s) => s.signed).length
+  const doneCount = contract.signers.filter((s) => s.signed).length
+  const hasReviewers = contract.signers.some((s) => s.kind === 'reviewer')
+  const inReview = contract.signers.some((s) => s.kind === 'reviewer' && !s.signed)
   const nameOf = (order) => contract.signers.find((s) => s.order === order)?.name
 
+  // Signers can only be invited once every reviewer has approved
   const canInvite = (s) =>
-    open && !s.signed && (contract.signingMethod === 'parallel' || contract.signers.every((x) => x.order >= s.order || x.signed))
+    open &&
+    !s.signed &&
+    (s.kind === 'reviewer' || !inReview) &&
+    (contract.signingMethod === 'parallel' || contract.signers.every((x) => x.order >= s.order || x.signed))
 
   const resend = async (s) => {
     setBusy(`resend-${s.order}`)
@@ -128,25 +138,30 @@ export default function ContractDetail() {
         <div className="detail-main">
           <div className="card pad">
             <div className="contract-progress-head">
-              <h3>Signers</h3>
+              <h3>{hasReviewers ? 'Reviewers & signers' : 'Signers'}</h3>
               <span className={`badge ${status.tone}`}>{status.label}</span>
             </div>
             <div className="progress-bar">
-              <span style={{ width: `${(signedCount / Math.max(1, contract.signers.length)) * 100}%` }} />
+              <span style={{ width: `${(doneCount / Math.max(1, contract.signers.length)) * 100}%` }} />
             </div>
             <p className="muted small">
-              {signedCount} of {contract.signers.length} signed ·{' '}
+              {doneCount} of {contract.signers.length} {hasReviewers ? 'done' : 'signed'} ·{' '}
+              {hasReviewers && 'reviewers approve first, then '}
               {contract.signingMethod === 'parallel' ? 'everyone signs in any order' : 'signers are invited one after another'}
             </p>
 
             <ul className="contract-signers">
               {contract.signers.map((s) => {
-                const st = SIGNER_STATUS[s.status] ?? SIGNER_STATUS.waiting
+                const reviewer = s.kind === 'reviewer'
+                const st = (reviewer ? REVIEWER_STATUS : SIGNER_STATUS)[s.status] ?? SIGNER_STATUS.waiting
                 return (
                   <li key={s.order} className={`is-${s.status}`}>
                     <span className="signer-dot">{s.signed ? <Icon name="check" size={12} /> : s.order}</span>
                     <div className="contract-signer-main">
-                      <strong>{s.name}</strong>
+                      <strong>
+                        {s.name}
+                        {reviewer && <span className="chip muted-chip">Reviewer</span>}
+                      </strong>
                       <span className="muted small">
                         {s.email}
                         {s.method && ` · ${methodLabels([s.method])[0] ?? s.method}`}
@@ -154,10 +169,11 @@ export default function ContractDetail() {
                       <span className="muted small contract-signer-times">
                         {s.invitedAt && <>Invited {formatDateTime(s.invitedAt)}</>}
                         {s.viewedAt && <> · Viewed {formatDateTime(s.viewedAt)}</>}
-                        {s.signedAt && <> · Signed {formatDateTime(s.signedAt)}</>}
-                        {s.declinedAt && <> · Declined {formatDateTime(s.declinedAt)}</>}
+                        {s.signedAt && <> · {reviewer ? 'Approved' : 'Signed'} {formatDateTime(s.signedAt)}</>}
+                        {s.declinedAt && <> · {reviewer ? 'Rejected' : 'Declined'} {formatDateTime(s.declinedAt)}</>}
                       </span>
                       {s.declineReason && <span className="decline-reason">“{s.declineReason}”</span>}
+                      {s.reviewComment && <span className="review-comment">“{s.reviewComment}”</span>}
                     </div>
                     <div className="contract-signer-actions">
                       <span className={`badge ${st.tone}`}>{st.label}</span>
@@ -249,7 +265,7 @@ export default function ContractDetail() {
         title={shared?.emailed ? 'Invitation sent' : 'Invitation not emailed'}
         subtitle={
           shared?.emailed
-            ? `A new signing link was emailed to ${shared.email}. Older links for ${shared?.name} no longer work.`
+            ? `A new link was emailed to ${shared.email}. Older links for ${shared?.name} no longer work.`
             : shared?.error
         }
         footer={
@@ -261,7 +277,7 @@ export default function ContractDetail() {
         <p className="muted small">You can also share this link with {shared?.name} directly. It is personal to them, so only send it to that person.</p>
         <div className="link-box">
           <code>{shared?.link}</code>
-          <CopyButton text={shared?.link ?? ''} onCopied={() => toast('Signing link copied')} />
+          <CopyButton text={shared?.link ?? ''} onCopied={() => toast('Link copied')} />
         </div>
       </Modal>
 
@@ -269,7 +285,7 @@ export default function ContractDetail() {
         open={confirmCancel}
         onClose={() => setConfirmCancel(false)}
         title="Cancel this contract?"
-        subtitle="Signers will no longer be able to open or sign it. This can't be undone."
+        subtitle="Reviewers and signers will no longer be able to open it. This can't be undone."
         footer={
           <>
             <button className="btn" onClick={() => setConfirmCancel(false)}>
