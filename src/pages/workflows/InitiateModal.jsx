@@ -28,8 +28,9 @@ export default function InitiateModal({ workflow, onClose }) {
     setSubmitted(true)
     if (values.some(invalid)) return
     setBusy(true)
+    let contract
     try {
-      await initiateContract(workflow, values)
+      contract = await initiateContract(workflow, values)
     } catch (err) {
       toast(err.message, 'error')
       return
@@ -37,8 +38,10 @@ export default function InitiateModal({ workflow, onClose }) {
       setBusy(false)
     }
     onClose()
-    toast('Contract initiated. Track it on the dashboard.')
-    navigate('/dashboard')
+    const failed = contract.invites.filter((i) => !i.emailed)
+    if (failed.length) toast(`Contract created, but the invitation email could not be sent to ${failed.map((i) => i.email).join(', ')}. Use "Resend link" on the contract page to share it.`, 'error')
+    else toast(`Contract initiated. Signing link emailed to ${contract.invites.map((i) => i.email).join(', ')}.`)
+    navigate(`/contracts/${contract.id}`)
   }
 
   return (
@@ -46,7 +49,11 @@ export default function InitiateModal({ workflow, onClose }) {
       open={!!workflow}
       onClose={onClose}
       title={`Initiate “${workflow?.name}”`}
-      subtitle="Enter the details of each signer. They'll be invited in the configured order."
+      subtitle={
+        workflow?.basic?.signingMethod === 'parallel'
+          ? 'Enter the details of each signer. Everyone gets their signing link by email right away.'
+          : 'Enter the details of each signer. Each one gets a signing link by email when it is their turn.'
+      }
       width={600}
       footer={
         <>

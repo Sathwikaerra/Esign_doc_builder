@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { listContracts } from '../services/contractService'
+import { CONTRACT_STATUS } from '../constants/contracts'
 import { formatDateTime } from '../utils/format'
 import Icon from '../components/ui/Icon'
 import { EmptyState, SortTh } from '../components/ui/Controls'
@@ -42,6 +44,8 @@ export default function Dashboard() {
   const [custom, setCustom] = useState({ from: '', to: '' })
   const [showCustom, setShowCustom] = useState(false)
   const [sort, setSort] = useState({ key: 'createdAt', dir: -1 })
+  const [statusFilter, setStatusFilter] = useState('incomplete')
+  const navigate = useNavigate()
 
   useEffect(() => {
     listContracts()
@@ -65,8 +69,8 @@ export default function Dashboard() {
   const signatures = inRange.flatMap((c) => c.signers.filter((s) => s.signed))
   const sigCount = (method) => signatures.filter((s) => s.method === method).length
 
-  const incomplete = inRange
-    .filter((c) => c.status === 'incomplete')
+  const listed = inRange
+    .filter((c) => statusFilter === 'all' || c.status === statusFilter)
     .sort((a, b) => SORTERS[sort.key](a, b) * sort.dir)
 
   const toggleSort = (key) => setSort((s) => ({ key, dir: s.key === key ? -s.dir : 1 }))
@@ -163,7 +167,17 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <h2 className="section-title">Incomplete Contracts</h2>
+      <div className="contracts-head">
+        <h2 className="section-title">Contracts</h2>
+        <div className="seg-tabs">
+          {['incomplete', 'completed', 'declined', 'expired', 'cancelled', 'all'].map((s) => (
+            <button key={s} className={statusFilter === s ? 'on' : ''} onClick={() => setStatusFilter(s)}>
+              {s === 'all' ? 'All' : CONTRACT_STATUS[s].label}
+              <span className="seg-count">{s === 'all' ? inRange.length : count(s)}</span>
+            </button>
+          ))}
+        </div>
+      </div>
       <div className="card">
         <div className="table-wrap">
           <table>
@@ -189,26 +203,32 @@ export default function Dashboard() {
                     ))}
                   </tr>
                 ))}
-              {incomplete.map((c) => (
-                <tr key={c.id}>
-                  <td className="mono">{c.id.slice(0, 12)}…</td>
-                  <td className="strong">{c.name}</td>
-                  <td>{formatDateTime(c.createdAt)}</td>
-                  <td>{formatDateTime(c.expiresAt)}</td>
-                  <td>{c.estamping}</td>
-                  <td>{c.signers.length}</td>
-                  <td>
-                    <span className="badge yellow">
-                      {c.signers.filter((s) => s.signed).length}/{c.signers.length} signed
-                    </span>
-                  </td>
-                </tr>
-              ))}
+              {listed.map((c) => {
+                const st = CONTRACT_STATUS[c.status] ?? { label: c.status, tone: 'grey' }
+                return (
+                  <tr key={c.id} className="row-link" onClick={() => navigate(`/contracts/${c.id}`)}>
+                    <td className="mono">{c.id.slice(0, 12)}…</td>
+                    <td className="strong">{c.name}</td>
+                    <td>{formatDateTime(c.createdAt)}</td>
+                    <td>{formatDateTime(c.expiresAt)}</td>
+                    <td>{c.estamping}</td>
+                    <td>{c.signers.length}</td>
+                    <td>
+                      <span className={`badge ${st.tone}`}>
+                        {c.status === 'incomplete' ? `${c.signers.filter((s) => s.signed).length}/${c.signers.length} signed` : st.label}
+                      </span>
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>
-        {contracts && incomplete.length === 0 && (
-          <EmptyState title="No incomplete contracts" message="Contracts initiated in this period that are still pending will appear here." />
+        {contracts && listed.length === 0 && (
+          <EmptyState
+            title={statusFilter === 'all' ? 'No contracts' : `No ${CONTRACT_STATUS[statusFilter].label.toLowerCase()} contracts`}
+            message="Contracts initiated in the selected period will appear here. Initiate one from the Workflows page."
+          />
         )}
       </div>
     </div>

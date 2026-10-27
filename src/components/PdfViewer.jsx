@@ -16,11 +16,24 @@ const DEFAULT_BOX = { w: 100, h: 60 } // px at 100% zoom
  * box: { id, owner, page, x, y, w, h }
  * When `editableOwner` is set, clicking/dragging on a page creates a box for that owner,
  * and that owner's boxes can be moved, resized, deleted or copied to other pages.
+ * Read-only views can pass `renderBox(box)` to draw custom box content and `onBoxClick(box)`.
  */
-export default function PdfViewer({ file, boxes = [], editableOwner, ownerInfo = {}, onAddBox, onUpdateBox, onDeleteBox, onCopyBox, onLoaded }) {
+export default function PdfViewer({ file, boxes = [], editableOwner, ownerInfo = {}, onAddBox, onUpdateBox, onDeleteBox, onCopyBox, onLoaded, renderBox, onBoxClick }) {
   const [pdf, setPdf] = useState(null)
   const [error, setError] = useState('')
   const [zoom, setZoom] = useState(1)
+  const scrollRef = useRef(null)
+  const [baseWidth, setBaseWidth] = useState(BASE_WIDTH)
+
+  // Pages render at BASE_WIDTH, or narrower when the viewer is (phones)
+  useEffect(() => {
+    const el = scrollRef.current
+    const observer = new ResizeObserver(([entry]) => {
+      setBaseWidth(Math.round(Math.min(BASE_WIDTH, Math.max(240, entry.contentRect.width - 24))))
+    })
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
 
   useEffect(() => {
     setPdf(null)
@@ -48,7 +61,7 @@ export default function PdfViewer({ file, boxes = [], editableOwner, ownerInfo =
 
   return (
     <div className="pdf-viewer">
-      <div className="pdf-scroll">
+      <div className="pdf-scroll" ref={scrollRef}>
         {!file && <div className="pdf-placeholder">No document uploaded</div>}
         {error && <div className="pdf-placeholder">{error}</div>}
         {file && !pdf && !error && <div className="pdf-placeholder">Loading document…</div>}
@@ -60,6 +73,7 @@ export default function PdfViewer({ file, boxes = [], editableOwner, ownerInfo =
               pageNumber={i + 1}
               total={pdf.numPages}
               zoom={zoom}
+              baseWidth={baseWidth}
               boxes={boxes.filter((b) => b.page === i + 1)}
               editableOwner={editableOwner}
               ownerInfo={ownerInfo}
@@ -67,6 +81,8 @@ export default function PdfViewer({ file, boxes = [], editableOwner, ownerInfo =
               onUpdateBox={onUpdateBox}
               onDeleteBox={onDeleteBox}
               onCopyBox={onCopyBox}
+              renderBox={renderBox}
+              onBoxClick={onBoxClick}
             />
           ))}
       </div>
@@ -83,7 +99,7 @@ export default function PdfViewer({ file, boxes = [], editableOwner, ownerInfo =
   )
 }
 
-function PdfPage({ pdf, pageNumber, total, zoom, boxes, editableOwner, ownerInfo, onAddBox, onUpdateBox, onDeleteBox, onCopyBox }) {
+function PdfPage({ pdf, pageNumber, total, zoom, baseWidth, boxes, editableOwner, ownerInfo, onAddBox, onUpdateBox, onDeleteBox, onCopyBox, renderBox, onBoxClick }) {
   const canvasRef = useRef(null)
   const overlayRef = useRef(null)
   const [size, setSize] = useState(null)
@@ -95,7 +111,7 @@ function PdfPage({ pdf, pageNumber, total, zoom, boxes, editableOwner, ownerInfo
     pdf.getPage(pageNumber).then((page) => {
       if (cancelled) return
       const base = page.getViewport({ scale: 1 })
-      const scale = (BASE_WIDTH * zoom) / base.width
+      const scale = (baseWidth * zoom) / base.width
       const viewport = page.getViewport({ scale })
       const ratio = window.devicePixelRatio || 1
       const canvas = canvasRef.current
@@ -115,7 +131,7 @@ function PdfPage({ pdf, pageNumber, total, zoom, boxes, editableOwner, ownerInfo
       cancelled = true
       renderTask?.cancel()
     }
-  }, [pdf, pageNumber, zoom])
+  }, [pdf, pageNumber, zoom, baseWidth])
 
   const toFraction = (e) => {
     const r = overlayRef.current.getBoundingClientRect()
@@ -192,10 +208,11 @@ function PdfPage({ pdf, pageNumber, total, zoom, boxes, editableOwner, ownerInfo
             const info = ownerInfo[b.owner] ?? {}
             const editable = b.owner === editableOwner
             const px = size ? { w: Math.round((b.w * size.w) / zoom), h: Math.round((b.h * size.h) / zoom) } : null
+            const custom = renderBox?.(b)
             return (
               <div
                 key={b.id}
-                className={`sig-box ${editable ? 'editable' : ''}`}
+                className={`sig-box ${editable ? 'editable' : ''} ${b.className ?? ''}`}
                 style={{
                   left: `${b.x * 100}%`,
                   top: `${b.y * 100}%`,
@@ -204,8 +221,9 @@ function PdfPage({ pdf, pageNumber, total, zoom, boxes, editableOwner, ownerInfo
                   '--box-color': info.color ?? '#0f766e',
                 }}
                 onPointerDown={editable ? (e) => startEdit(e, b, 'move') : undefined}
+                onClick={onBoxClick ? () => onBoxClick(b) : undefined}
               >
-                <span className="sig-box-label">{info.label ?? 'Signer'}</span>
+                {custom ?? <span className="sig-box-label">{info.label ?? 'Signer'}</span>}
                 {editable && (
                   <>
                     <span className="sig-box-size">
