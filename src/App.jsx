@@ -11,6 +11,7 @@ import TemplateList from './pages/templates/TemplateList'
 import TemplateForm from './pages/templates/TemplateForm'
 import ContractDetail from './pages/contracts/ContractDetail'
 import SignDocument from './pages/SignDocument'
+import Developers from './pages/Developers'
 
 export default function App() {
   return (
@@ -33,6 +34,7 @@ export default function App() {
           <Route path="/templates/new" element={<TemplateForm />} />
           <Route path="/templates/:id" element={<TemplateForm />} />
           <Route path="/contracts/:id" element={<ContractDetail />} />
+          <Route path="/developers" element={<Developers />} />
         </Route>
       </Route>
 

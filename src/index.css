@@ -1242,6 +1242,44 @@ li.is-invited > .signer-dot, li.is-viewed > .signer-dot, li.is-pending > .signer
 }
 
 
+/* ---------- Developers page ---------- */
+.dev-intro { max-width: 760px; margin-top: -6px; }
+.dev-card { display: flex; flex-direction: column; gap: 16px; }
+.dev-card.card:not(.pad) { padding: 20px 0 0; }
+.dev-head { display: flex; align-items: flex-start; gap: 12px; }
+.dev-head.pad-x { padding: 0 22px; }
+.dev-head > div { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.dev-icon { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 12px; flex-shrink: 0; color: #fff; background: var(--primary); box-shadow: 0 6px 14px -6px color-mix(in srgb, var(--primary) 70%, transparent); }
+.dev-card code { font-family: ui-monospace, Consolas, monospace; font-size: 0.8rem; background: color-mix(in srgb, var(--primary) 8%, transparent); color: var(--text); padding: 1px 6px; border-radius: 6px; }
+.dev-quick { display: flex; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
+.dev-quick .field { width: min(360px, 100%); }
+.dev-wf-id { display: flex; align-items: center; gap: 8px; padding-bottom: 8px; flex-wrap: wrap; }
+.dev-code { border-radius: 14px; overflow: hidden; background: #14122a; border: 1px solid #2a2650; }
+.dev-code-bar { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px 8px 16px; color: #b9b4e6; font-size: 0.78rem; font-weight: 600; border-bottom: 1px solid #2a2650; }
+.dev-code-bar .icon-btn { color: #b9b4e6; }
+.dev-code pre { margin: 0; padding: 14px 16px; overflow-x: auto; color: #e9e6ff; font: 0.8rem/1.55 ui-monospace, Consolas, monospace; }
+.dev-notes { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; font-size: 0.86rem; color: var(--muted); }
+.dev-notes strong { color: var(--text); }
+.dev-revoked td { opacity: 0.55; }
+.dev-danger, .link-btn.dev-danger { color: var(--red); }
+.btn.primary.dev-danger-btn { background: var(--red); }
+.dev-secret { display: flex; align-items: center; gap: 6px; padding: 10px 12px; border-radius: 12px; border: 1px dashed var(--border-strong); background: var(--surface-2); min-width: 0; }
+.dev-secret code { flex: 1; min-width: 0; overflow-wrap: anywhere; background: none !important; padding: 0 !important; font-size: 0.84rem !important; }
+.dev-hook-form { display: flex; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
+.dev-hook-form .field { flex: 1; min-width: min(320px, 100%); }
+.dev-hook-form .toggle, .dev-hook-form .btn { margin-bottom: 4px; }
+.dev-secret-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px; }
+.dev-hook-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.dev-details summary { cursor: pointer; font-weight: 600; font-size: 0.86rem; color: var(--primary); }
+.dev-details p { margin-top: 8px; color: var(--muted); line-height: 1.7; }
+.dev-event { margin-right: 4px; }
+.dev-deliveries { display: flex; flex-direction: column; gap: 8px; }
+.dev-deliveries table { border: 1px solid var(--border); border-radius: 14px; }
+.badge.dev-fail { background: #ffe4e9; color: #be123c; }
+@media (max-width: 760px) {
+  .dev-secret-row { grid-template-columns: 1fr; }
+  .dev-head { flex-wrap: wrap; }
+}
 /* ---------- Glass & depth ----------
  * Frosted translucent surfaces over a slowly drifting colour field, layered shadows with a lit top edge,
  * pointer-driven 3D tilt (utils/tilt.js) and a faint red/cyan "3D glasses" offset on big headings and numbers.

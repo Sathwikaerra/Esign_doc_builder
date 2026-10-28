@@ -6,6 +6,7 @@ const MENU_ITEMS = [
   { to: '/dashboard', label: 'Dashboard', icon: 'dashboard' },
   { to: '/workflows', label: 'Workflows', icon: 'workflow' },
   { to: '/templates', label: 'Templates', icon: 'template' },
+  { to: '/developers', label: 'Developers', icon: 'braces' },
 ]
 
 export default function Sidebar({ expanded, onToggleExpanded, mobileOpen, onNavigate }) {
