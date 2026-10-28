@@ -5,9 +5,11 @@ import { AuthProvider } from './context/AuthContext'
 import { ToastProvider } from './components/ui/Toast'
 import App from './App'
 import { applyTheme, getTheme } from './utils/theme'
+import { initTilt } from './utils/tilt'
 import './index.css'
 
 applyTheme(getTheme())
+initTilt()
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import Icon from './Icon'
 
 function useEscape(open, onClose) {
@@ -13,7 +14,7 @@ function useEscape(open, onClose) {
 export function Modal({ open, onClose, title, subtitle, children, footer, width = 560 }) {
   useEscape(open, onClose)
   if (!open) return null
-  return (
+  return createPortal(
     <div className="overlay" onMouseDown={(e) => e.target === e.currentTarget && onClose?.()}>
       <div className="modal" style={{ maxWidth: width }} role="dialog" aria-modal="true">
         <div className="modal-head">
@@ -28,14 +29,15 @@ export function Modal({ open, onClose, title, subtitle, children, footer, width 
         <div className="modal-body">{children}</div>
         {footer && <div className="modal-foot">{footer}</div>}
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
 
 export function Drawer({ open, onClose, title, subtitle, actions, children, width = 360 }) {
   useEscape(open, onClose)
   if (!open) return null
-  return (
+  return createPortal(
     <div className="overlay drawer-overlay" onMouseDown={(e) => e.target === e.currentTarget && onClose?.()}>
       <aside className="drawer" style={{ width }} role="dialog" aria-modal="true">
         <div className="drawer-head">
@@ -52,6 +54,7 @@ export function Drawer({ open, onClose, title, subtitle, actions, children, widt
         </div>
         <div className="drawer-body">{children}</div>
       </aside>
-    </div>
+    </div>,
+    document.body,
   )
 }
