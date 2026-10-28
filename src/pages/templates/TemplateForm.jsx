@@ -6,6 +6,7 @@ import { shortId } from '../../utils/format'
 import DocEditor from '../../components/editor/DocEditor'
 import { DEFAULT_PAGE_SETUP } from '../../components/editor/pageSetup'
 import Icon from '../../components/ui/Icon'
+import MethodIcon from '../../components/signing/MethodIcon'
 import { EmptyState, Field, Pills } from '../../components/ui/Controls'
 import { useToast } from '../../components/ui/Toast'
 import { templateSummary } from './TemplateList'
@@ -262,7 +263,7 @@ export default function TemplateForm() {
                           return (
                             <button key={m.id} className={`method-tile ${idx >= 0 ? 'on' : ''}`} onClick={() => toggleMethod(p, m.id)}>
                               {idx >= 0 && <span className="order">{idx + 1}</span>}
-                              <Icon name={m.icon} size={18} />
+                              <MethodIcon method={m.id} size={26} />
                               <span>{m.label}</span>
                             </button>
                           )

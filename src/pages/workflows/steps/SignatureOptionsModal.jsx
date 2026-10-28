@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { POST_SIGNING_METHODS, PRE_SIGNING_METHODS, SIGNATURE_METHODS } from '../../../constants/workflow'
-import Icon from '../../../components/ui/Icon'
+import MethodIcon from '../../../components/signing/MethodIcon'
 import { Modal } from '../../../components/ui/Overlay'
 
 // "More Options": choose signature methods and verification for one signer.
@@ -70,7 +70,7 @@ export default function SignatureOptionsModal({ participant, onClose, onSave }) 
           return (
             <button key={m.id} className={`method-tile ${idx >= 0 ? 'on' : ''}`} onClick={() => toggleIn('methods', m.id)}>
               {idx >= 0 && sequential && <span className="order">{idx + 1}</span>}
-              <Icon name={m.icon} size={20} />
+              <MethodIcon method={m.id} size={32} />
               <span>{m.label}</span>
             </button>
           )
