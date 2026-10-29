@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { deleteTemplate, listTemplates } from '../../services/templateService'
 import { STARTER_DOCS } from '../../constants/docTemplates'
 import { EXPIRY_UNITS } from '../../constants/workflow'
 import { formatDateTime } from '../../utils/format'
+import { IMPORT_ACCEPT, exportTemplate, readTemplateFile } from '../../utils/importTemplate'
 import { pageGeometry } from '../../components/editor/pageSetup'
 import Icon from '../../components/ui/Icon'
 import { EmptyState, PageTitle } from '../../components/ui/Controls'
@@ -40,6 +41,8 @@ export default function TemplateList() {
   const [templates, setTemplates] = useState(null)
   const [search, setSearch] = useState('')
   const [showGallery, setShowGallery] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const fileInput = useRef(null)
 
   const reload = () =>
     listTemplates()
@@ -68,6 +71,21 @@ export default function TemplateList() {
     }
   }
 
+  const importFile = async (e) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    setImporting(true)
+    try {
+      const imported = await readTemplateFile(file)
+      navigate('/templates/new', { state: { imported } })
+    } catch (err) {
+      toast(err.message, 'error')
+    } finally {
+      setImporting(false)
+    }
+  }
+
   const open = (t) => navigate(`/templates/${t.id}`)
   const stop = (fn) => (e) => {
     e.stopPropagation()
@@ -77,6 +95,10 @@ export default function TemplateList() {
   return (
     <div className="page">
       <PageTitle title="Templates" crumbs={['Dashboard', 'Templates']}>
+        <input ref={fileInput} type="file" accept={IMPORT_ACCEPT} hidden onChange={importFile} />
+        <button className="btn" onClick={() => fileInput.current.click()} disabled={importing}>
+          <Icon name="import" size={16} /> {importing ? 'Importing…' : 'Import'}
+        </button>
         <button className="btn primary" onClick={() => setShowGallery(true)}>
           <Icon name="plus" size={16} /> Create Template
         </button>
@@ -130,7 +152,10 @@ export default function TemplateList() {
               <button className="btn sm" onClick={stop(() => open(t))}>
                 <Icon name="edit" size={14} /> Open
               </button>
-              <button className="icon-btn danger push" onClick={stop(() => remove(t))} aria-label={`Delete ${t.name}`}>
+              <button className="icon-btn push" onClick={stop(() => exportTemplate(t))} aria-label={`Export ${t.name}`} title="Export to a file">
+                <Icon name="download" size={16} />
+              </button>
+              <button className="icon-btn danger" onClick={stop(() => remove(t))} aria-label={`Delete ${t.name}`}>
                 <Icon name="trash" size={16} />
               </button>
             </div>
@@ -140,6 +165,13 @@ export default function TemplateList() {
 
       <Modal open={showGallery} onClose={() => setShowGallery(false)} title="New template" subtitle="Start with a blank page or a ready-made document." width={900}>
         <div className="gallery-grid">
+          <button className="gallery-item" onClick={() => fileInput.current.click()} disabled={importing}>
+            <div className="doc-thumb blank">
+              <Icon name="import" size={30} />
+            </div>
+            <strong>{importing ? 'Importing…' : 'Import from computer'}</strong>
+            <span className="muted small">Word (.docx), HTML, text or an exported template (.json)</span>
+          </button>
           {STARTER_DOCS.map((d) => (
             <button key={d.id} className="gallery-item" onClick={() => navigate('/templates/new', { state: { starter: d.id } })}>
               {d.id === 'blank' ? (

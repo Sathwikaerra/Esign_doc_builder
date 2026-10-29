@@ -29,7 +29,7 @@ export default function TemplateForm() {
   const location = useLocation()
   const navigate = useNavigate()
   const toast = useToast()
-  const [tpl, setTpl] = useState(() => (isNew ? emptyTemplate(location.state?.starter) : null))
+  const [tpl, setTpl] = useState(() => (isNew ? { ...emptyTemplate(location.state?.starter), ...location.state?.imported } : null))
   const [view, setView] = useState('document')
   const [notFound, setNotFound] = useState(false)
   const [submitted, setSubmitted] = useState(false)
