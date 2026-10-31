@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { POST_SIGNING_METHODS, PRE_SIGNING_METHODS, SIGNATURE_METHODS } from '../../../constants/workflow'
+import { LEGACY_CAPTURES, POST_SIGNING_METHODS, PRE_SIGNING_METHODS, SIGNATURE_METHODS } from '../../../constants/workflow'
+import Icon from '../../../components/ui/Icon'
 import MethodIcon from '../../../components/signing/MethodIcon'
 import { Modal } from '../../../components/ui/Overlay'
 
@@ -10,7 +11,15 @@ export default function SignatureOptionsModal({ participant, onClose, onSave }) 
   useEffect(() => {
     if (participant) {
       const { signatureType, exposure, methods, preMethods, postMethods } = participant
-      setState({ signatureType, exposure, methods, preMethods, postMethods })
+      setState({
+        signatureType,
+        exposure,
+        methods,
+        preMethods,
+        postMethods: postMethods.filter((m) => !LEGACY_CAPTURES[m]),
+        captureLocation: !!participant.captureLocation || postMethods.includes('Location Capture'),
+        capturePhoto: !!participant.capturePhoto || postMethods.includes('Selfie Capture'),
+      })
     }
   }, [participant])
 
@@ -87,6 +96,25 @@ export default function SignatureOptionsModal({ participant, onClose, onSave }) 
           </p>
         </div>
       )}
+
+      <p className="config-title">Capture while signing</p>
+      <div className="capture-grid">
+        {[
+          ['captureLocation', 'mapPin', 'GPS location', "The signer shares their device's location before signing. It is recorded with a map link."],
+          ['capturePhoto', 'face', 'Live photo', 'The signer takes a photo of themselves with the camera before signing.'],
+        ].map(([key, icon, label, help]) => (
+          <label key={key} className={`capture-tile ${state[key] ? 'on' : ''}`}>
+            <input type="checkbox" checked={state[key]} onChange={(e) => set({ [key]: e.target.checked })} />
+            <span className="capture-icon">
+              <Icon name={icon} size={20} />
+            </span>
+            <span>
+              <b>{label}</b>
+              <span className="muted small">{help}</span>
+            </span>
+          </label>
+        ))}
+      </div>
 
       <div className="exec-order">
         <div>

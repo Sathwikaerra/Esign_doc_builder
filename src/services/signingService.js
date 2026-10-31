@@ -17,9 +17,10 @@ export async function getSigningDocument(token, challengeId) {
 export const startVerification = (token, body) => api(`${base(token)}/verify/start`, { method: 'POST', body })
 export const completeVerification = (token, body) => api(`${base(token)}/verify/complete`, { method: 'POST', body })
 
-// signature: PNG data URL; type: 'draw' | 'type' | 'stamp'; method + challengeId from the check (acceptedName for Clickwrap)
-export const signDocument = (token, { signature, type, method, challengeId, acceptedName }) =>
-  api(`${base(token)}/sign`, { method: 'POST', body: { signature, type, consent: true, method, challengeId, acceptedName } })
+// signature: PNG data URL; type: 'draw' | 'type' | 'stamp'; method + challengeId from the check (acceptedName for Clickwrap);
+// location { lat, lng, accuracy } and photo (JPEG data URL) when the workflow asks for them
+export const signDocument = (token, { signature, type, method, challengeId, acceptedName, location, photo }) =>
+  api(`${base(token)}/sign`, { method: 'POST', body: { signature, type, consent: true, method, challengeId, acceptedName, location, photo } })
 
 // Reviewers only: approves the document (comment is optional); signers are invited once every reviewer approves
 export const approveDocument = (token, comment) => api(`${base(token)}/approve`, { method: 'POST', body: { comment } })

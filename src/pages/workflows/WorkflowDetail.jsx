@@ -158,6 +158,15 @@ export default function WorkflowDetail() {
                     <KV label="Exposure" value={p.exposure === 'parallel' ? 'Parallel' : 'Sequential'} />
                     <KV label="Pre-signing" value={p.preMethods.join(', ')} />
                     <KV label="Post-signing" value={p.postMethods.join(', ')} />
+                    <KV
+                      label="Capture while signing"
+                      value={[
+                        (p.captureLocation || p.postMethods.includes('Location Capture')) && 'GPS location',
+                        (p.capturePhoto || p.postMethods.includes('Selfie Capture')) && 'Live photo',
+                      ]
+                        .filter(Boolean)
+                        .join(', ')}
+                    />
                   </>
                 )}
                 <KV label="Signature boxes" value={String(workflow.boxes.filter((b) => b.owner === p.id).length)} />

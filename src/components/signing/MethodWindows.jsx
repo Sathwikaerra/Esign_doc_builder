@@ -375,24 +375,15 @@ function FingerprintWindow({ open, onClose, token, me, sandbox, onVerified, onEr
   )
 }
 
-/* ---------- Aadhaar face ---------- */
+/* ---------- Camera (face auth and the live photo) ---------- */
 
-function FaceWindow({ open, onClose, token, me, sandbox, onVerified, onError }) {
-  const [started, setStarted] = useState(null)
-  const [busy, setBusy] = useState(false)
+// Live camera preview with a face guide; the camera starts when this mounts and stops when it unmounts.
+// onUse(photo) gets a JPEG data URL.
+export function CameraCapture({ busy, onUse, useLabel = 'Use this photo' }) {
   const [photo, setPhoto] = useState(null)
   const [cameraError, setCameraError] = useState('')
   const video = useRef(null)
   const stream = useRef(null)
-
-  const stop = () => {
-    stream.current?.getTracks().forEach((t) => t.stop())
-    stream.current = null
-  }
-  useEffect(() => stop, [])
-  useEffect(() => {
-    if (!open) stop()
-  }, [open])
 
   // The video element comes and goes (Retake), so the stream is attached whenever it mounts
   const attachVideo = (el) => {
@@ -405,20 +396,14 @@ function FaceWindow({ open, onClose, token, me, sandbox, onVerified, onError }) 
       stream.current = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: 640, height: 480 }, audio: false })
       if (video.current) video.current.srcObject = stream.current
     } catch {
-      setCameraError('Allow camera access in your browser to continue. Face authentication needs a live photo.')
+      setCameraError('Allow camera access in your browser to continue. A live photo is needed.')
     }
   }
-  const start = async (aadhaar) => {
-    setBusy(true)
-    try {
-      setStarted(await startVerification(token, { method: 'AADHAAR_FACE', aadhaar, consent: true }))
-      setTimeout(openCamera, 0)
-    } catch (err) {
-      onError(err.message)
-    } finally {
-      setBusy(false)
-    }
-  }
+  useEffect(() => {
+    openCamera()
+    return () => stream.current?.getTracks().forEach((t) => t.stop())
+  }, [])
+
   const capture = () => {
     const v = video.current
     if (!v?.videoWidth) return
@@ -428,11 +413,56 @@ function FaceWindow({ open, onClose, token, me, sandbox, onVerified, onError }) 
     c.getContext('2d').drawImage(v, 0, 0, c.width, c.height)
     setPhoto(c.toDataURL('image/jpeg', 0.75))
   }
-  const verify = async () => {
+
+  return (
+    <div className="mw-form">
+      <div className="mw-camera">
+        {photo ? <img src={photo} alt="Your photo" /> : <video ref={attachVideo} autoPlay playsInline muted />}
+        {!photo && <div className="mw-face-guide" />}
+      </div>
+      {cameraError && <p className="mw-error">{cameraError}</p>}
+      {cameraError && (
+        <button className="btn block" onClick={openCamera}>
+          Try the camera again
+        </button>
+      )}
+      {!photo ? (
+        <button className="btn primary block" onClick={capture} disabled={!!cameraError}>
+          <Icon name="face" size={16} /> Take photo
+        </button>
+      ) : (
+        <>
+          <button className="btn primary block" onClick={() => onUse(photo)} disabled={busy}>
+            <Busy busy={busy}>{useLabel}</Busy>
+          </button>
+          <button className="btn ghost block" onClick={() => setPhoto(null)} disabled={busy}>
+            Retake
+          </button>
+        </>
+      )}
+    </div>
+  )
+}
+
+/* ---------- Aadhaar face ---------- */
+
+function FaceWindow({ open, onClose, token, me, sandbox, onVerified, onError }) {
+  const [started, setStarted] = useState(null)
+  const [busy, setBusy] = useState(false)
+  const start = async (aadhaar) => {
+    setBusy(true)
+    try {
+      setStarted(await startVerification(token, { method: 'AADHAAR_FACE', aadhaar, consent: true }))
+    } catch (err) {
+      onError(err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+  const verify = async (photo) => {
     setBusy(true)
     try {
       const r = await completeVerification(token, { challengeId: started.challengeId, capture: { photo } })
-      stop()
       onVerified({
         method: 'AADHAAR_FACE',
         challengeId: started.challengeId,
@@ -448,40 +478,7 @@ function FaceWindow({ open, onClose, token, me, sandbox, onVerified, onError }) 
   return (
     <WindowShell open={open} onClose={onClose} method="AADHAAR_FACE" subtitle="Sign by matching a live photo of your face with your Aadhaar record.">
       {sandbox && <SandboxNote>Not connected to UIDAI. Your photo is kept with the audit record but is not matched against Aadhaar.</SandboxNote>}
-      {!started ? (
-        <AadhaarStep busy={busy} onSubmit={start} action="Continue to camera" />
-      ) : (
-        <div className="mw-form">
-          <div className="mw-camera">
-            {photo ? <img src={photo} alt="Your photo" /> : <video ref={attachVideo} autoPlay playsInline muted />}
-            {!photo && <div className="mw-face-guide" />}
-          </div>
-          {cameraError && <p className="mw-error">{cameraError}</p>}
-          {cameraError && (
-            <button className="btn block" onClick={openCamera}>
-              Try the camera again
-            </button>
-          )}
-          {!photo ? (
-            <button className="btn primary block" onClick={capture} disabled={!!cameraError}>
-              <Icon name="face" size={16} /> Take photo
-            </button>
-          ) : (
-            <>
-              <button className="btn primary block" onClick={verify} disabled={busy}>
-                <Busy busy={busy}>Use this photo</Busy>
-              </button>
-              <button
-                className="btn ghost block"
-                onClick={() => setPhoto(null)}
-                disabled={busy}
-              >
-                Retake
-              </button>
-            </>
-          )}
-        </div>
-      )}
+      {!started ? <AadhaarStep busy={busy} onSubmit={start} action="Continue to camera" /> : open && <CameraCapture busy={busy} onUse={verify} />}
     </WindowShell>
   )
 }

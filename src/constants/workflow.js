@@ -10,7 +10,9 @@ export const SIGNATURE_METHODS = [
 ]
 
 export const PRE_SIGNING_METHODS = ['Email OTP', 'Mobile OTP', 'Video KYC']
-export const POST_SIGNING_METHODS = ['Selfie Capture', 'Location Capture', 'Feedback Form']
+export const POST_SIGNING_METHODS = ['Feedback Form']
+// Older workflows stored location / selfie here; they now have their own switches (captureLocation, capturePhoto)
+export const LEGACY_CAPTURES = { 'Location Capture': 'captureLocation', 'Selfie Capture': 'capturePhoto' }
 
 export const PARTICIPANT_KINDS = {
   signer: { label: 'Signer', plural: 'Signers', needsMethods: true, needsBoxes: true },

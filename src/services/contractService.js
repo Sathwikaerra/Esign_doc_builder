@@ -24,6 +24,12 @@ export async function downloadContractDocument(id, kind) {
   return { blob: await res.blob(), fileName: fileNameFrom(res) }
 }
 
+// Live photo a signer took while signing, as an image blob
+export async function getSignerPhoto(id, order) {
+  const res = await api(`/contracts/${id}/signers/${order}/photo`, { raw: true })
+  return res.blob()
+}
+
 export function fileNameFrom(res, fallback = 'contract.pdf') {
   const header = res.headers.get('content-disposition') || ''
   const m = /filename\*=UTF-8''([^;]+)/i.exec(header)

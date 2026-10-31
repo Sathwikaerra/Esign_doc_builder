@@ -56,6 +56,8 @@ export default function SigneeStep({ draft, setDraft, file, numPages, onPagesLoa
       methods: [],
       preMethods: [],
       postMethods: [],
+      captureLocation: false,
+      capturePhoto: false,
       autoSource: kind === 'auto' ? 'seal' : undefined,
     }
     setParticipants((ps) => [...ps, p])
@@ -95,6 +97,8 @@ export default function SigneeStep({ draft, setDraft, file, numPages, onPagesLoa
       exposure: src.exposure,
       preMethods: src.preMethods,
       postMethods: src.postMethods,
+      captureLocation: src.captureLocation,
+      capturePhoto: src.capturePhoto,
       copiedFrom: src.name,
     })
   }

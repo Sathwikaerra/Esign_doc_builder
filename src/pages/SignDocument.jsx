@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import PdfViewer from '../components/PdfViewer'
 import SignatureModal from '../components/signing/SignatureModal'
-import MethodWindow, { methodLabel, usesStamp } from '../components/signing/MethodWindows'
+import MethodWindow, { CameraCapture, methodLabel, usesStamp } from '../components/signing/MethodWindows'
 import MethodIcon from '../components/signing/MethodIcon'
 import Icon from '../components/ui/Icon'
 import { Modal } from '../components/ui/Overlay'
@@ -42,6 +42,10 @@ export default function SignDocument() {
   const [methodOpen, setMethodOpen] = useState(false)
   const [windowKey, setWindowKey] = useState(0)
   const [entered, setEntered] = useState(false) // past the identity check, so the document is shown
+  const [location, setLocation] = useState(null) // { lat, lng, accuracy }
+  const [locating, setLocating] = useState(false)
+  const [photo, setPhoto] = useState(null)
+  const [photoOpen, setPhotoOpen] = useState(false)
 
   const loadDocument = (challengeId) =>
     getSigningDocument(token, challengeId)
@@ -106,6 +110,10 @@ export default function SignDocument() {
   }
 
   const { contract, me, canSign } = view
+  const wantsLocation = me.captures?.includes('location')
+  const wantsPhoto = me.captures?.includes('photo')
+  const capturesDone = (!wantsLocation || !!location) && (!wantsPhoto || !!photo)
+  const consentStep = 4 + (wantsLocation ? 1 : 0) + (wantsPhoto ? 1 : 0)
   const isReviewer = me.kind === 'reviewer'
   const hasReviewers = view.signers.some((s) => s.kind === 'reviewer')
   const doneCount = view.signers.filter((s) => s.status === 'signed').length
@@ -156,8 +164,30 @@ export default function SignDocument() {
     else if (!usesStamp(method)) setPadOpen(true)
   }
 
+  // GPS / browser location, when the workflow asks for it
+  const shareLocation = () => {
+    if (!navigator.geolocation) return toast('This browser cannot share its location. Try another browser or your phone.', 'error')
+    setLocating(true)
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy })
+        setLocating(false)
+      },
+      (err) => {
+        setLocating(false)
+        toast(
+          err.code === err.PERMISSION_DENIED
+            ? 'Location access was blocked. Allow location for this site in your browser settings, then try again.'
+            : 'Could not get your location. Turn on location (GPS) and try again.',
+          'error',
+        )
+      },
+      { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 },
+    )
+  }
+
   const finish = async () => {
-    if (!signature || !consent || !verified) return
+    if (!signature || !consent || !verified || !capturesDone) return
     setBusy(true)
     try {
       const next = await signDocument(token, {
@@ -166,6 +196,8 @@ export default function SignDocument() {
         method: verified.method,
         challengeId: verified.challengeId,
         acceptedName: verified.acceptedName,
+        location: wantsLocation ? location : undefined,
+        photo: wantsPhoto ? photo : undefined,
       })
       setView(next)
       setJustSigned(true)
@@ -296,10 +328,40 @@ export default function SignDocument() {
                     )}
                   </div>
                 </li>
-                <li className={signature ? (consent ? 'done' : 'current') : ''}>
-                  <span>4</span>
+                {wantsLocation && (
+                  <li className={location ? 'done' : signature ? 'current' : ''}>
+                    <span>4</span>
+                    <div>
+                      {location ? 'Location shared' : 'Share your location'}
+                      {location ? (
+                        <a className="small" href={`https://maps.google.com/?q=${location.lat},${location.lng}`} target="_blank" rel="noreferrer">
+                          <Icon name="mapPin" size={13} /> {location.lat.toFixed(5)}, {location.lng.toFixed(5)} (within {Math.round(location.accuracy)} m)
+                        </a>
+                      ) : (
+                        <span className="muted small">The sender asks for your location at the time of signing.</span>
+                      )}
+                      <button className="btn soft sm" onClick={shareLocation} disabled={!signature || locating}>
+                        <Icon name="mapPin" size={14} /> {locating ? 'Locating…' : location ? 'Update location' : 'Share location'}
+                      </button>
+                    </div>
+                  </li>
+                )}
+                {wantsPhoto && (
+                  <li className={photo ? 'done' : signature && (!wantsLocation || location) ? 'current' : ''}>
+                    <span>{wantsLocation ? 5 : 4}</span>
+                    <div>
+                      {photo ? 'Live photo taken' : 'Take a live photo'}
+                      {photo ? <img src={photo} alt="Your live photo" className="sign-photo" /> : <span className="muted small">A photo of you, taken now with your camera.</span>}
+                      <button className="btn soft sm" onClick={() => setPhotoOpen(true)} disabled={!signature}>
+                        <Icon name="face" size={14} /> {photo ? 'Retake photo' : 'Open camera'}
+                      </button>
+                    </div>
+                  </li>
+                )}
+                <li className={signature && capturesDone ? (consent ? 'done' : 'current') : ''}>
+                  <span>{consentStep}</span>
                   <label className="sign-consent">
-                    <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} disabled={!signature} />
+                    <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} disabled={!signature || !capturesDone} />
                     <span>
                       I agree that this electronic signature is the legal equivalent of my handwritten signature on this document, and I consent to signing it
                       electronically.
@@ -307,7 +369,7 @@ export default function SignDocument() {
                   </label>
                 </li>
               </ol>
-              <button className="btn primary block" disabled={!signature || !consent || busy} onClick={finish}>
+              <button className="btn primary block" disabled={!signature || !consent || !capturesDone || busy} onClick={finish}>
                 {busy ? (
                   <>
                     <Spinner /> Signing…
@@ -371,6 +433,17 @@ export default function SignDocument() {
           onError={(msg) => toast(msg, 'error')}
         />
       )}
+
+      <Modal open={photoOpen} onClose={() => setPhotoOpen(false)} title="Live photo" subtitle="Face the camera in good light, then take the photo." width={480}>
+        {photoOpen && (
+          <CameraCapture
+            onUse={(p) => {
+              setPhoto(p)
+              setPhotoOpen(false)
+            }}
+          />
+        )}
+      </Modal>
 
       <SignatureModal
         open={padOpen}

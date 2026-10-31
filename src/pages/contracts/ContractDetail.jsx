@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { cancelContract, downloadContractDocument, getContract, resendInvite, saveBlob } from '../../services/contractService'
+import { cancelContract, downloadContractDocument, getContract, getSignerPhoto, resendInvite, saveBlob } from '../../services/contractService'
 import { methodLabels } from '../../constants/workflow'
 import { CONTRACT_STATUS } from '../../constants/contracts'
 import { formatDateTime } from '../../utils/format'
@@ -16,6 +16,24 @@ const SIGNER_STATUS = {
   signed: { label: 'Signed', tone: 'green' },
   declined: { label: 'Declined', tone: 'red' },
 }
+// Live photo taken while signing; the image needs the login token, so it is fetched as a blob
+function SignerPhoto({ contractId, order, name }) {
+  const [url, setUrl] = useState(null)
+  useEffect(() => {
+    let objectUrl
+    getSignerPhoto(contractId, order)
+      .then((blob) => setUrl((objectUrl = URL.createObjectURL(blob))))
+      .catch(() => {})
+    return () => objectUrl && URL.revokeObjectURL(objectUrl)
+  }, [contractId, order])
+  if (!url) return null
+  return (
+    <a href={url} target="_blank" rel="noreferrer" title={`Live photo of ${name}`}>
+      <img src={url} alt={`Live photo of ${name}`} className="signer-photo" />
+    </a>
+  )
+}
+
 // Reviewers approve or reject instead of signing or declining
 const REVIEWER_STATUS = { ...SIGNER_STATUS, signed: { label: 'Approved', tone: 'green' }, declined: { label: 'Rejected', tone: 'red' } }
 
@@ -172,6 +190,17 @@ export default function ContractDetail() {
                         {s.signedAt && <> · {reviewer ? 'Approved' : 'Signed'} {formatDateTime(s.signedAt)}</>}
                         {s.declinedAt && <> · {reviewer ? 'Rejected' : 'Declined'} {formatDateTime(s.declinedAt)}</>}
                       </span>
+                      {(s.location || s.hasPhoto) && (
+                        <span className="contract-signer-captures">
+                          {s.hasPhoto && <SignerPhoto contractId={contract.id} order={s.order} name={s.name} />}
+                          {s.location && (
+                            <a className="small" href={`https://maps.google.com/?q=${s.location.lat},${s.location.lng}`} target="_blank" rel="noreferrer">
+                              <Icon name="mapPin" size={13} /> {s.location.lat.toFixed(5)}, {s.location.lng.toFixed(5)}
+                              {s.location.accuracy != null && ` (within ${s.location.accuracy} m)`}
+                            </a>
+                          )}
+                        </span>
+                      )}
                       {s.declineReason && <span className="decline-reason">“{s.declineReason}”</span>}
                       {s.reviewComment && <span className="review-comment">“{s.reviewComment}”</span>}
                     </div>
