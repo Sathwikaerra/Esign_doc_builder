@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import PdfViewer from '../components/PdfViewer'
 import SignatureModal from '../components/signing/SignatureModal'
+import MethodWindow, { methodLabel, usesStamp } from '../components/signing/MethodWindows'
+import MethodIcon from '../components/signing/MethodIcon'
 import Icon from '../components/ui/Icon'
 import { Modal } from '../components/ui/Overlay'
 import { Spinner } from '../components/auth/AuthLayout'
@@ -16,7 +18,8 @@ const SIGNED_COLOR = '#16a34a'
 
 /*
  * Public page a signer reaches from the emailed link (/sign/:token).
- * They review the PDF, adopt a signature (drawn or typed), agree, and finish.
+ * They review the PDF, pass the identity check of their signing method (each method has its own
+ * window, see MethodWindows), adopt a signature, agree, and finish.
  * Reviewers get the same page without signing: they approve (with an optional comment) or reject.
  */
 export default function SignDocument() {
@@ -33,6 +36,10 @@ export default function SignDocument() {
   const [reason, setReason] = useState('')
   const [justSigned, setJustSigned] = useState(false)
   const [comment, setComment] = useState('')
+  const [method, setMethod] = useState(null)
+  const [verified, setVerified] = useState(null) // { method, challengeId?, acceptedName?, summary, stamp? }
+  const [methodOpen, setMethodOpen] = useState(false)
+  const [windowKey, setWindowKey] = useState(0)
 
   const loadDocument = () =>
     getSigningDocument(token)
@@ -43,6 +50,7 @@ export default function SignDocument() {
     getSigning(token)
       .then((v) => {
         setView(v)
+        setMethod(v.me.methods?.[0] ?? null)
         loadDocument()
       })
       .catch((err) => {
@@ -112,11 +120,40 @@ export default function SignDocument() {
     return <span className="sig-box-label">{b.kind === 'auto' ? `${b.label} (auto)` : b.label}</span>
   }
 
+  const openMethod = () => {
+    setWindowKey((k) => k + 1)
+    setMethodOpen(true)
+  }
+  const chooseMethod = (m) => {
+    if (m === method) return
+    setMethod(m)
+    setVerified(null)
+    setSignature(null)
+  }
+  const onVerified = (r) => {
+    setVerified(r)
+    setMethodOpen(false)
+    if (r.stamp) setSignature({ image: r.stamp, type: 'stamp' })
+    else setPadOpen(true)
+    toast(`${methodLabel(r.method)}: verified`)
+  }
+  // Clicking a signature box starts with the method's check, then the signature
+  const onMyBox = () => {
+    if (!verified) openMethod()
+    else if (!usesStamp(method)) setPadOpen(true)
+  }
+
   const finish = async () => {
-    if (!signature || !consent) return
+    if (!signature || !consent || !verified) return
     setBusy(true)
     try {
-      const next = await signDocument(token, { signature: signature.image, type: signature.type })
+      const next = await signDocument(token, {
+        signature: signature.image,
+        type: signature.type,
+        method: verified.method,
+        challengeId: verified.challengeId,
+        acceptedName: verified.acceptedName,
+      })
       setView(next)
       setJustSigned(true)
       if (next.contract.status === 'completed') loadDocument()
@@ -165,7 +202,7 @@ export default function SignDocument() {
     <SignShell contract={contract}>
       <div className="sign-layout">
         <div className="sign-doc">
-          <PdfViewer file={file} boxes={boxes} ownerInfo={ownerInfo} renderBox={renderBox} onBoxClick={(b) => b.mine && canSign && setPadOpen(true)} />
+          <PdfViewer file={file} boxes={boxes} ownerInfo={ownerInfo} renderBox={renderBox} onBoxClick={(b) => b.mine && canSign && onMyBox()} />
         </div>
 
         <aside className="sign-side">
@@ -203,18 +240,56 @@ export default function SignDocument() {
                 <li className="done">
                   <span>1</span> Review the document on the left
                 </li>
-                <li className={signature ? 'done' : 'current'}>
+                <li className={verified ? 'done' : 'current'}>
                   <span>2</span>
+                  <div className="sign-method-step">
+                    {me.methods.length > 1 && !verified && (
+                      <>
+                        Choose how to sign
+                        <div className="sign-method-choices">
+                          {me.methods.map((m) => (
+                            <button key={m} className={`sign-method-choice ${m === method ? 'on' : ''}`} onClick={() => chooseMethod(m)}>
+                              <MethodIcon method={m} size={22} /> {methodLabel(m)}
+                            </button>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                    {verified ? (
+                      <>
+                        <span className="sign-method-done">
+                          <MethodIcon method={verified.method} size={22} /> {methodLabel(verified.method)}
+                        </span>
+                        <span className="muted small">{verified.summary}</span>
+                      </>
+                    ) : (
+                      <>
+                        {me.methods.length === 1 && (
+                          <span className="sign-method-done">
+                            <MethodIcon method={method} size={22} /> Sign with {methodLabel(method)}
+                          </span>
+                        )}
+                        <button className="btn soft sm" onClick={openMethod}>
+                          <Icon name="shield" size={14} /> {method === 'CLICKWRAP' ? 'Review and accept' : 'Verify and sign'}
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </li>
+                <li className={signature ? 'done' : verified ? 'current' : ''}>
+                  <span>3</span>
                   <div>
-                    {signature ? 'Signature adopted' : `Add your signature (${myBoxes.length} place${myBoxes.length === 1 ? '' : 's'})`}
+                    {signature ? (usesStamp(method) ? 'Signature created by ' + methodLabel(method) : 'Signature adopted') : 'Add your signature'}
                     {signature && <img src={signature.image} alt="" className="sign-preview" />}
-                    <button className="btn soft sm" onClick={() => setPadOpen(true)}>
-                      <Icon name={signature ? 'edit' : 'signature'} size={14} /> {signature ? 'Change signature' : 'Add signature'}
-                    </button>
+                    {verified && !usesStamp(method) && (
+                      <button className="btn soft sm" onClick={() => setPadOpen(true)}>
+                        <Icon name={signature ? 'edit' : 'signature'} size={14} /> {signature ? 'Change signature' : 'Add signature'}
+                      </button>
+                    )}
                   </div>
                 </li>
                 <li className={signature ? (consent ? 'done' : 'current') : ''}>
-                  <span>3</span>
+                  <span>4</span>
                   <label className="sign-consent">
                     <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} disabled={!signature} />
                     <span>
@@ -272,6 +347,21 @@ export default function SignDocument() {
           </div>
         </aside>
       </div>
+
+      {method && (
+        <MethodWindow
+          key={windowKey}
+          method={method}
+          open={methodOpen}
+          onClose={() => setMethodOpen(false)}
+          token={token}
+          me={me}
+          contract={contract}
+          sandbox={view.sandbox}
+          onVerified={onVerified}
+          onError={(msg) => toast(msg, 'error')}
+        />
+      )}
 
       <SignatureModal
         open={padOpen}

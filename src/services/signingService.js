@@ -11,9 +11,13 @@ export async function getSigningDocument(token) {
   return { blob: await res.blob(), fileName: fileNameFrom(res, 'document.pdf') }
 }
 
-// signature: PNG data URL; type: 'draw' | 'type'
-export const signDocument = (token, { signature, type }) =>
-  api(`${base(token)}/sign`, { method: 'POST', body: { signature, type, consent: true } })
+// Identity check for a signing method: start returns what the method's window shows next
+export const startVerification = (token, body) => api(`${base(token)}/verify/start`, { method: 'POST', body })
+export const completeVerification = (token, body) => api(`${base(token)}/verify/complete`, { method: 'POST', body })
+
+// signature: PNG data URL; type: 'draw' | 'type' | 'stamp'; method + challengeId from the check (acceptedName for Clickwrap)
+export const signDocument = (token, { signature, type, method, challengeId, acceptedName }) =>
+  api(`${base(token)}/sign`, { method: 'POST', body: { signature, type, consent: true, method, challengeId, acceptedName } })
 
 // Reviewers only: approves the document (comment is optional); signers are invited once every reviewer approves
 export const approveDocument = (token, comment) => api(`${base(token)}/approve`, { method: 'POST', body: { comment } })
