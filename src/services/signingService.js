@@ -13,6 +13,9 @@ export async function getSigningDocument(token, challengeId) {
   return { blob: await res.blob(), fileName: fileNameFrom(res, 'document.pdf') }
 }
 
+// Street address of the signer's location, shown before they sign (the server looks it up again when signing)
+export const getLocationAddress = (token, { lat, lng }) => api(`${base(token)}/address`, { method: 'POST', body: { lat, lng } })
+
 // Identity check for a signing method: start returns what the method's window shows next
 export const startVerification = (token, body) => api(`${base(token)}/verify/start`, { method: 'POST', body })
 export const completeVerification = (token, body) => api(`${base(token)}/verify/complete`, { method: 'POST', body })

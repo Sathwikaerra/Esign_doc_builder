@@ -8,7 +8,8 @@ import Icon from '../components/ui/Icon'
 import { Modal } from '../components/ui/Overlay'
 import { Spinner } from '../components/auth/AuthLayout'
 import { useToast } from '../components/ui/Toast'
-import { approveDocument, declineDocument, getSigning, getSigningDocument, signDocument } from '../services/signingService'
+import { approveDocument, declineDocument, getLocationAddress, getSigning, getSigningDocument, signDocument } from '../services/signingService'
+import MapModal from '../components/ui/MapModal'
 import { saveBlob } from '../services/contractService'
 import { formatDateTime } from '../utils/format'
 
@@ -42,7 +43,8 @@ export default function SignDocument() {
   const [methodOpen, setMethodOpen] = useState(false)
   const [windowKey, setWindowKey] = useState(0)
   const [entered, setEntered] = useState(false) // past the identity check, so the document is shown
-  const [location, setLocation] = useState(null) // { lat, lng, accuracy }
+  const [location, setLocation] = useState(null) // { lat, lng, accuracy, address? }
+  const [mapOpen, setMapOpen] = useState(false)
   const [locating, setLocating] = useState(false)
   const [photo, setPhoto] = useState(null)
   const [photoOpen, setPhotoOpen] = useState(false)
@@ -170,8 +172,13 @@ export default function SignDocument() {
     setLocating(true)
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        setLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy })
+        const point = { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy }
+        setLocation({ ...point, address: undefined })
         setLocating(false)
+        // undefined = still looking up, null = no address found
+        getLocationAddress(token, point)
+          .then(({ address }) => setLocation((cur) => (cur?.lat === point.lat && cur?.lng === point.lng ? { ...cur, address } : cur)))
+          .catch(() => setLocation((cur) => (cur ? { ...cur, address: null } : cur)))
       },
       (err) => {
         setLocating(false)
@@ -334,9 +341,15 @@ export default function SignDocument() {
                     <div>
                       {location ? 'Location shared' : 'Share your location'}
                       {location ? (
-                        <a className="small" href={`https://maps.google.com/?q=${location.lat},${location.lng}`} target="_blank" rel="noreferrer">
-                          <Icon name="mapPin" size={13} /> {location.lat.toFixed(5)}, {location.lng.toFixed(5)} (within {Math.round(location.accuracy)} m)
-                        </a>
+                        <button type="button" className="location-chip" onClick={() => setMapOpen(true)} title="Show on map">
+                          <Icon name="mapPin" size={14} />
+                          <span>
+                            <b>{location.address === undefined ? 'Finding your address…' : location.address || 'Address not found'}</b>
+                            <span className="muted small">
+                              {location.lat.toFixed(5)}, {location.lng.toFixed(5)} · within {Math.round(location.accuracy)} m · View map
+                            </span>
+                          </span>
+                        </button>
                       ) : (
                         <span className="muted small">The sender asks for your location at the time of signing.</span>
                       )}
@@ -433,6 +446,8 @@ export default function SignDocument() {
           onError={(msg) => toast(msg, 'error')}
         />
       )}
+
+      {mapOpen && <MapModal location={location} onClose={() => setMapOpen(false)} title="Your location" />}
 
       <Modal open={photoOpen} onClose={() => setPhotoOpen(false)} title="Live photo" subtitle="Face the camera in good light, then take the photo." width={480}>
         {photoOpen && (

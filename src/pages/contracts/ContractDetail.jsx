@@ -7,6 +7,7 @@ import { formatDateTime } from '../../utils/format'
 import Icon from '../../components/ui/Icon'
 import { CopyButton, EmptyState, PageTitle } from '../../components/ui/Controls'
 import { Modal } from '../../components/ui/Overlay'
+import MapModal from '../../components/ui/MapModal'
 import { useToast } from '../../components/ui/Toast'
 
 const SIGNER_STATUS = {
@@ -53,6 +54,7 @@ const EVENT_LABELS = {
 export default function ContractDetail() {
   const { id } = useParams()
   const toast = useToast()
+  const [mapFor, setMapFor] = useState(null) // signer whose location is shown on the map
   const [contract, setContract] = useState(undefined)
   const [busy, setBusy] = useState('')
   const [shared, setShared] = useState(null) // { name, link, emailed, error }
@@ -194,10 +196,16 @@ export default function ContractDetail() {
                         <span className="contract-signer-captures">
                           {s.hasPhoto && <SignerPhoto contractId={contract.id} order={s.order} name={s.name} />}
                           {s.location && (
-                            <a className="small" href={`https://maps.google.com/?q=${s.location.lat},${s.location.lng}`} target="_blank" rel="noreferrer">
-                              <Icon name="mapPin" size={13} /> {s.location.lat.toFixed(5)}, {s.location.lng.toFixed(5)}
-                              {s.location.accuracy != null && ` (within ${s.location.accuracy} m)`}
-                            </a>
+                            <button type="button" className="location-chip" onClick={() => setMapFor(s)} title="Show on map">
+                              <Icon name="mapPin" size={14} />
+                              <span>
+                                <b>{s.location.address || 'Address not available'}</b>
+                                <span className="muted small">
+                                  {s.location.lat.toFixed(5)}, {s.location.lng.toFixed(5)}
+                                  {s.location.accuracy != null && ` · within ${s.location.accuracy} m`} · View map
+                                </span>
+                              </span>
+                            </button>
                           )}
                         </span>
                       )}
@@ -309,6 +317,8 @@ export default function ContractDetail() {
           <CopyButton text={shared?.link ?? ''} onCopied={() => toast('Link copied')} />
         </div>
       </Modal>
+
+      {mapFor && <MapModal location={mapFor.location} onClose={() => setMapFor(null)} title={`Where ${mapFor.name} signed`} />}
 
       <Modal
         open={confirmCancel}
