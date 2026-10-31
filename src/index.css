@@ -1440,3 +1440,17 @@ input, select, textarea { background-color: var(--glass-strong); }
 .sign-method-choice { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font: inherit; font-size: 0.84rem; font-weight: 500; cursor: pointer; text-align: left; }
 .sign-method-choice.on { border-color: var(--primary); box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 25%, transparent); }
 .sign-method-done { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; color: var(--text); }
+
+/* Identity check before the document opens (SignDocument IdentityGate) */
+.sign-gate { max-width: 520px; margin: 48px auto; display: flex; flex-direction: column; gap: 12px; }
+.sign-gate-card { display: flex; flex-direction: column; gap: 12px; text-align: center; align-items: stretch; }
+.sign-gate-card h2 { margin: 0; font-size: 1.3rem; }
+.sign-gate-card > p { margin: 0 0 4px; line-height: 1.5; }
+.sign-gate-icon { align-self: center; width: 60px; height: 60px; border-radius: 18px; display: grid; place-items: center; color: #fff;
+  background: linear-gradient(135deg, var(--primary), color-mix(in srgb, var(--primary) 55%, #ec4899)); box-shadow: 0 10px 24px color-mix(in srgb, var(--primary) 35%, transparent); }
+.sign-gate-label { text-align: left; }
+.sign-gate-methods { display: flex; flex-direction: column; gap: 8px; }
+.sign-gate-methods .sign-method-choice { padding: 10px 12px; font-size: 0.92rem; }
+.sign-gate-methods .sign-method-choice:disabled { cursor: default; opacity: 1; }
+.sign-gate-tick { margin-left: auto; color: var(--primary); }
+.sign-gate-note { text-align: center; }

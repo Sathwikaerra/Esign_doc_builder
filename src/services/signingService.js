@@ -6,8 +6,10 @@ const base = (token) => `/sign/${encodeURIComponent(token)}`
 
 export const getSigning = (token) => api(base(token))
 
-export async function getSigningDocument(token) {
-  const res = await api(`${base(token)}/document`, { raw: true })
+// Signers who still have to sign pass the id of their verified identity check
+export async function getSigningDocument(token, challengeId) {
+  const query = challengeId ? `?challengeId=${encodeURIComponent(challengeId)}` : ''
+  const res = await api(`${base(token)}/document${query}`, { raw: true })
   return { blob: await res.blob(), fileName: fileNameFrom(res, 'document.pdf') }
 }
 

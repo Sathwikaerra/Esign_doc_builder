@@ -18,8 +18,9 @@ const SIGNED_COLOR = '#16a34a'
 
 /*
  * Public page a signer reaches from the emailed link (/sign/:token).
- * They review the PDF, pass the identity check of their signing method (each method has its own
- * window, see MethodWindows), adopt a signature, agree, and finish.
+ * Signers first pass the identity check of their signing method (each method has its own window,
+ * see MethodWindows); only then does the PDF open for them to read, sign, agree and finish.
+ * Clickwrap signers read first and accept at the end, since accepting is their signature.
  * Reviewers get the same page without signing: they approve (with an optional comment) or reject.
  */
 export default function SignDocument() {
@@ -40,9 +41,10 @@ export default function SignDocument() {
   const [verified, setVerified] = useState(null) // { method, challengeId?, acceptedName?, summary, stamp? }
   const [methodOpen, setMethodOpen] = useState(false)
   const [windowKey, setWindowKey] = useState(0)
+  const [entered, setEntered] = useState(false) // past the identity check, so the document is shown
 
-  const loadDocument = () =>
-    getSigningDocument(token)
+  const loadDocument = (challengeId) =>
+    getSigningDocument(token, challengeId)
       .then(({ blob }) => setFile(blob))
       .catch((err) => toast(err.message, 'error'))
 
@@ -51,7 +53,9 @@ export default function SignDocument() {
       .then((v) => {
         setView(v)
         setMethod(v.me.methods?.[0] ?? null)
-        loadDocument()
+        const gate = needsIdentityCheck(v)
+        setEntered(!gate)
+        if (!gate) loadDocument()
       })
       .catch((err) => {
         setError(err.message)
@@ -134,8 +138,17 @@ export default function SignDocument() {
     setVerified(r)
     setMethodOpen(false)
     if (r.stamp) setSignature({ image: r.stamp, type: 'stamp' })
-    else setPadOpen(true)
+    else if (entered) setPadOpen(true)
+    if (!entered) {
+      // Verified on the first screen: now the document opens
+      setEntered(true)
+      loadDocument(r.challengeId)
+    }
     toast(`${methodLabel(r.method)}: verified`)
+  }
+  const continueWithClickwrap = () => {
+    setEntered(true)
+    loadDocument()
   }
   // Clicking a signature box starts with the method's check, then the signature
   const onMyBox = () => {
@@ -191,7 +204,7 @@ export default function SignDocument() {
 
   const download = async () => {
     try {
-      const { blob, fileName } = await getSigningDocument(token)
+      const { blob, fileName } = await getSigningDocument(token, verified?.challengeId)
       saveBlob(blob, fileName)
     } catch (err) {
       toast(err.message, 'error')
@@ -200,6 +213,15 @@ export default function SignDocument() {
 
   return (
     <SignShell contract={contract}>
+      {!entered ? (
+        <IdentityGate
+          view={view}
+          method={method}
+          onChoose={chooseMethod}
+          onStart={() => (method === 'CLICKWRAP' ? continueWithClickwrap() : openMethod())}
+          onDecline={() => setDeclineOpen(true)}
+        />
+      ) : (
       <div className="sign-layout">
         <div className="sign-doc">
           <PdfViewer file={file} boxes={boxes} ownerInfo={ownerInfo} renderBox={renderBox} onBoxClick={(b) => b.mine && canSign && onMyBox()} />
@@ -243,18 +265,6 @@ export default function SignDocument() {
                 <li className={verified ? 'done' : 'current'}>
                   <span>2</span>
                   <div className="sign-method-step">
-                    {me.methods.length > 1 && !verified && (
-                      <>
-                        Choose how to sign
-                        <div className="sign-method-choices">
-                          {me.methods.map((m) => (
-                            <button key={m} className={`sign-method-choice ${m === method ? 'on' : ''}`} onClick={() => chooseMethod(m)}>
-                              <MethodIcon method={m} size={22} /> {methodLabel(m)}
-                            </button>
-                          ))}
-                        </div>
-                      </>
-                    )}
                     {verified ? (
                       <>
                         <span className="sign-method-done">
@@ -264,11 +274,9 @@ export default function SignDocument() {
                       </>
                     ) : (
                       <>
-                        {me.methods.length === 1 && (
-                          <span className="sign-method-done">
-                            <MethodIcon method={method} size={22} /> Sign with {methodLabel(method)}
-                          </span>
-                        )}
+                        <span className="sign-method-done">
+                          <MethodIcon method={method} size={22} /> Sign with {methodLabel(method)}
+                        </span>
                         <button className="btn soft sm" onClick={openMethod}>
                           <Icon name="shield" size={14} /> {method === 'CLICKWRAP' ? 'Review and accept' : 'Verify and sign'}
                         </button>
@@ -347,6 +355,7 @@ export default function SignDocument() {
           </div>
         </aside>
       </div>
+      )}
 
       {method && (
         <MethodWindow
@@ -395,6 +404,63 @@ export default function SignDocument() {
         </label>
       </Modal>
     </SignShell>
+  )
+}
+
+// Signers who still have to sign verify themselves before the document opens; a Clickwrap-only
+// signer reads first, because clicking "I agree" at the end is their signature
+function needsIdentityCheck(v) {
+  const onlyClickwrap = v.me.methods.length === 1 && v.me.methods[0] === 'CLICKWRAP'
+  return v.me.kind !== 'reviewer' && v.me.status === 'pending' && v.contract.status === 'incomplete' && !onlyClickwrap
+}
+
+function IdentityGate({ view, method, onChoose, onStart, onDecline }) {
+  const { contract, me, canSign } = view
+  const from = `${contract.sender ? `${contract.sender} from ` : ''}${contract.organisation}`
+  if (!canSign) {
+    return (
+      <div className="sign-gate">
+        <StatusCard view={view} justSigned={false} onDownload={null} />
+        <p className="muted small sign-gate-note">You will verify your identity and open the document when it is your turn.</p>
+      </div>
+    )
+  }
+  return (
+    <div className="sign-gate">
+      <div className="card pad sign-gate-card">
+        <span className="sign-gate-icon">
+          <Icon name="shield" size={28} />
+        </span>
+        <h2>Verify your identity to open the document</h2>
+        <p className="muted">
+          {from} sent you <b>{contract.name}</b> to sign before {formatDateTime(contract.expiresAt)}. For your security, confirm it is you first; the document opens
+          right after.
+        </p>
+        {me.methods.length > 1 && <span className="field-label sign-gate-label">Choose how to sign</span>}
+        <div className="sign-gate-methods">
+          {me.methods.map((m) => (
+            <button key={m} className={`sign-method-choice ${m === method ? 'on' : ''}`} onClick={() => onChoose(m)} disabled={me.methods.length === 1}>
+              <MethodIcon method={m} size={26} /> {methodLabel(m)}
+              {m === method && <Icon name="checkCircle" size={16} className="sign-gate-tick" />}
+            </button>
+          ))}
+        </div>
+        <button className="btn primary block" onClick={onStart}>
+          {method === 'CLICKWRAP' ? (
+            <>
+              Continue to document <Icon name="arrowRight" size={16} />
+            </>
+          ) : (
+            <>
+              <Icon name="lock" size={16} /> Verify with {methodLabel(method)}
+            </>
+          )}
+        </button>
+        <button className="btn ghost block sign-decline" onClick={onDecline}>
+          Decline to sign
+        </button>
+      </div>
+    </div>
   )
 }
 
@@ -451,9 +517,11 @@ function StatusCard({ view, justSigned, onDownload }) {
       <div>
         <h3>{title}</h3>
         <p>{text}</p>
-        <button className="btn sm" onClick={onDownload}>
-          <Icon name="download" size={14} /> {contract.status === 'completed' ? 'Download signed PDF' : 'Download PDF'}
-        </button>
+        {onDownload && (
+          <button className="btn sm" onClick={onDownload}>
+            <Icon name="download" size={14} /> {contract.status === 'completed' ? 'Download signed PDF' : 'Download PDF'}
+          </button>
+        )}
       </div>
     </div>
   )
