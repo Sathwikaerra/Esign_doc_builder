@@ -1,6 +1,6 @@
 // Small fetch wrapper for the backend API (see /backend).
-// In development Vite forwards /api to http://localhost:4000 (vite.config.js).
-// For a deployed API set VITE_API_URL, e.g. https://api.example.com/api
+// In development Vite forwards /api to the backend (vite.config.js, VITE_DEV_API_PROXY).
+// For an API on another address set VITE_API_URL, e.g. https://api.example.com/api (see .env.example)
 const BASE = (import.meta.env.VITE_API_URL || '/api').replace(/\/$/, '')
 export const SESSION_KEY = 'esign_session'
 
