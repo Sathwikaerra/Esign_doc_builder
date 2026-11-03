@@ -9,6 +9,7 @@ import Icon from './ui/Icon'
 import { Drawer } from './ui/Overlay'
 import { CopyButton, EmptyState } from './ui/Controls'
 import { useToast } from './ui/Toast'
+import './Header.css'
 
 const SESSION_SECONDS = 25 * 60
 

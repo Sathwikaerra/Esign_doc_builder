@@ -1,0 +1,164 @@
+/* Replace your old .sidebar rules with this file.
+   Collapsed width: 76px | Expanded width: 248px
+   Sidebar sits in the layout flow (flex child) next to your main area. */
+.sidebar {
+  --sb-w: 76px;
+  --sb-w-open: 248px;
+  --sb-bg: linear-gradient(180deg, #0f172a 0%, #111c3a 100%);
+  --sb-text: #94a3b8;
+  --sb-text-hover: #e2e8f0;
+  --sb-accent: #6366f1;
+  --sb-accent-2: #8b5cf6;
+
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  flex: none;
+  z-index: 50;
+  width: var(--sb-w);
+  padding: 18px 14px;
+  background: var(--sb-bg);
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: 4px 0 24px rgba(15, 23, 42, 0.18);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: width 0.25s ease, transform 0.25s ease;
+  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+.sidebar.expanded { width: var(--sb-w-open); }
+
+/* ---------- Logo ---------- */
+.sidebar-logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 48px;
+  padding: 0 4px;
+  margin-bottom: 14px;
+  overflow: hidden;
+}
+.logo-mark {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: linear-gradient(135deg, var(--sb-accent), var(--sb-accent-2));
+  box-shadow: 0 6px 16px rgba(99, 102, 241, 0.45);
+}
+.brand {
+  color: #f8fafc;
+  font-size: 17px;
+  font-weight: 500;
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+}
+.brand b { font-weight: 700; color: #a5b4fc; }
+
+/* ---------- Expand / collapse button ---------- */
+.sidebar-expand {
+  position: absolute;
+  top: 28px;
+  right: -12px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  color: #475569;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.2);
+  transition: transform 0.15s ease, color 0.15s ease;
+}
+.sidebar-expand:hover { color: var(--sb-accent); transform: scale(1.1); }
+
+/* ---------- Section label ---------- */
+.nav-section {
+  margin: 4px 0 2px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+/* ---------- Nav items ---------- */
+.sidebar nav { display: flex; flex-direction: column; gap: 4px; }
+
+.nav-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  height: 46px;
+  padding: 0 14px;
+  border-radius: 12px;
+  color: var(--sb-text);
+  text-decoration: none;
+  font-size: 14.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: background 0.18s ease, color 0.18s ease;
+}
+.nav-icon { flex: none; transition: transform 0.18s ease; }
+.nav-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--sb-text-hover);
+}
+.nav-item:hover .nav-icon { transform: translateX(2px); }
+
+.nav-item.active {
+  color: #fff;
+  background: linear-gradient(90deg, rgba(99, 102, 241, 0.32), rgba(139, 92, 246, 0.12));
+}
+.nav-item.active .nav-icon { color: #a5b4fc; }
+.nav-item.active::before {
+  content: '';
+  position: absolute;
+  left: -14px;
+  top: 10px;
+  bottom: 10px;
+  width: 4px;
+  border-radius: 0 4px 4px 0;
+  background: linear-gradient(180deg, var(--sb-accent), var(--sb-accent-2));
+}
+
+/* ---------- Labels hidden when collapsed ---------- */
+.nav-label { opacity: 0; width: 0; overflow: hidden; transition: opacity 0.2s ease; }
+.sidebar.expanded .nav-label,
+.sidebar.mobile-open .nav-label { opacity: 1; width: auto; }
+
+/* ---------- Tooltip when collapsed ---------- */
+.sidebar:not(.expanded) .nav-item:hover::after {
+  content: attr(data-tip);
+  position: absolute;
+  left: calc(100% + 16px);
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: #1e293b;
+  color: #f1f5f9;
+  font-size: 12.5px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3);
+  pointer-events: none;
+}
+
+/* ---------- Mobile drawer ---------- */
+@media (max-width: 768px) {
+  .sidebar {
+    position: fixed;
+    inset: 0 auto 0 0;
+    height: auto;
+    transform: translateX(-100%);
+    width: var(--sb-w-open);
+  }
+  .sidebar.mobile-open { transform: translateX(0); }
+  .sidebar-expand { display: none; }
+  .nav-label { opacity: 1; width: auto; }
+}
