@@ -1,9 +1,11 @@
 // Colour themes. The palette for each lives in index.css under [data-theme='<id>'].
 export const THEMES = [
+  { id: 'white-blue', label: 'White & Blue', swatch: ['#ffffff', '#2563eb'] },
   { id: 'aurora', label: 'Aurora', swatch: ['#7c3aed', '#ec4899'] },
   { id: 'ocean', label: 'Ocean', swatch: ['#2563eb', '#06b6d4'] },
   { id: 'sunset', label: 'Sunset', swatch: ['#f97316', '#e11d48'] },
   { id: 'forest', label: 'Forest', swatch: ['#059669', '#84cc16'] },
+  { id: 'wheat-navy', label: 'Wheat & Navy', swatch: ['#f4efdf', '#183153'] },
   { id: 'midnight', label: 'Midnight', swatch: ['#6366f1', '#22d3ee'], dark: true },
 ]
 
