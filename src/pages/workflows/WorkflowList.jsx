@@ -34,6 +34,8 @@ export default function WorkflowList() {
   const [showNewMenu, setShowNewMenu] = useState(false)
   const [showTemplates, setShowTemplates] = useState(false)
   const [initiating, setInitiating] = useState(null)
+  const [deactivateTarget, setDeactivateTarget] = useState(null)
+  const [changingStatus, setChangingStatus] = useState(false)
   const [sort, setSort] = useState({ key: 'createdAt', dir: -1 })
   const [page, setPage] = useState(0)
   const [perPage, setPerPage] = useState(5)
@@ -95,6 +97,21 @@ export default function WorkflowList() {
         reload()
       })
       .catch(fail)
+
+  const confirmDeactivate = async () => {
+    if (!deactivateTarget || changingStatus) return
+    setChangingStatus(true)
+    try {
+      await setWorkflowStatus(deactivateTarget.id, 'inactive')
+      toast('Workflow deactivated')
+      setDeactivateTarget(null)
+      reload()
+    } catch (err) {
+      fail(err)
+    } finally {
+      setChangingStatus(false)
+    }
+  }
 
   const removeDraft = (w) => {
     if (!window.confirm(`Delete draft "${w.name}"?`)) return
@@ -175,6 +192,7 @@ export default function WorkflowList() {
               <table>
                 <thead>
                   <tr>
+                    <th className="dx-serial">S.No</th>
                     <th>Workflow ID</th>
                     <SortTh label="Workflow Name" k="name" sort={sort} onSort={toggleSort} />
                     <SortTh label="Created At" k="createdAt" sort={sort} onSort={toggleSort} />
@@ -186,15 +204,16 @@ export default function WorkflowList() {
                   {!workflows &&
                     [1, 2, 3].map((i) => (
                       <tr key={i} className="skeleton-row">
-                        {Array.from({ length: 5 }, (_, j) => (
+                        {Array.from({ length: 6 }, (_, j) => (
                           <td key={j}>
                             <span className="skeleton" />
                           </td>
                         ))}
                       </tr>
                     ))}
-                  {paged.map((w) => (
+                  {paged.map((w, index) => (
                     <tr key={w.id}>
+                      <td className="dx-serial">{page * perPage + index + 1}</td>
                       <td className="nowrap">
                         <Link to={`/workflows/${w.id}`} className="id-link">
                           {w.id}
@@ -210,7 +229,7 @@ export default function WorkflowList() {
                             <button className="link-btn" onClick={() => setInitiating(w)}>
                               Initiate <Icon name="external" size={14} />
                             </button>
-                            <button className="link-btn muted-link" onClick={() => changeStatus(w, 'inactive', 'Workflow deactivated')}>
+                            <button className="btn danger-outline xs" onClick={() => setDeactivateTarget(w)}>
                               Deactivate
                             </button>
                           </>
@@ -277,6 +296,27 @@ export default function WorkflowList() {
         </div>
       </Modal>
 
+      <Modal
+        open={!!deactivateTarget}
+        onClose={() => !changingStatus && setDeactivateTarget(null)}
+        title="Deactivate workflow?"
+        subtitle="This workflow will move to Inactive Workflows. You can activate it again later."
+        footer={
+          <>
+            <button className="btn" onClick={() => setDeactivateTarget(null)} disabled={changingStatus}>
+              Keep active
+            </button>
+            <button className="btn danger" onClick={confirmDeactivate} disabled={changingStatus}>
+              {changingStatus ? 'Deactivating…' : 'Deactivate workflow'}
+            </button>
+          </>
+        }
+      >
+        <p>
+          Are you sure you want to deactivate <strong>{deactivateTarget?.name}</strong>?
+        </p>
+      </Modal>
+
       <InitiateModal workflow={initiating} onClose={() => setInitiating(null)} />
     </div>
   )
@@ -289,6 +329,7 @@ function TemplateTable({ templates, onUse }) {
         <table>
           <thead>
             <tr>
+              <th className="dx-serial">S.No</th>
               <th>Template</th>
               <th>Description</th>
               <th>Participants</th>
@@ -297,8 +338,9 @@ function TemplateTable({ templates, onUse }) {
             </tr>
           </thead>
           <tbody>
-            {templates.map((t) => (
+            {templates.map((t, index) => (
               <tr key={t.id}>
+                <td className="dx-serial">{index + 1}</td>
                 <td className="strong">{t.name}</td>
                 <td>{t.description}</td>
                 <td className="nowrap">{templateSummary(t)}</td>

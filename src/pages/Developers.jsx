@@ -142,6 +142,8 @@ function QuickStart() {
 function ApiKeys() {
   const toast = useToast()
   const [keys, setKeys] = useState(null)
+  const [page, setPage] = useState(0)
+  const [perPage, setPerPage] = useState(5)
   const [creating, setCreating] = useState(false)
   const [name, setName] = useState('')
   const [busy, setBusy] = useState(false)
@@ -152,6 +154,8 @@ function ApiKeys() {
   useEffect(() => {
     load()
   }, [load])
+  const currentPage = Math.min(page, Math.max(0, Math.ceil((keys?.length ?? 0) / perPage) - 1))
+  const visibleKeys = (keys ?? []).slice(currentPage * perPage, (currentPage + 1) * perPage)
 
   async function create() {
     setBusy(true)
@@ -219,7 +223,7 @@ function ApiKeys() {
                   </td>
                 </tr>
               ))}
-            {keys?.map((k) => (
+            {visibleKeys.map((k) => (
               <tr key={k.id} className={k.revokedAt ? 'dev-revoked' : ''}>
                 <td className="strong">{k.name}</td>
                 <td>
@@ -243,6 +247,18 @@ function ApiKeys() {
           </tbody>
         </table>
         {keys?.length === 0 && <EmptyState title="No API keys yet" message="Create a key for each system that will call the API." />}
+        {!!keys?.length && (
+          <DeveloperPagination
+            page={currentPage}
+            perPage={perPage}
+            total={keys.length}
+            onPageChange={setPage}
+            onPerPageChange={(value) => {
+              setPerPage(value)
+              setPage(0)
+            }}
+          />
+        )}
       </div>
 
       <Modal
@@ -314,6 +330,8 @@ function Webhook() {
   const [showSecret, setShowSecret] = useState(false)
   const [busy, setBusy] = useState(false)
   const [deliveries, setDeliveries] = useState([])
+  const [deliveryPage, setDeliveryPage] = useState(0)
+  const [deliveryPerPage, setDeliveryPerPage] = useState(5)
 
   const loadDeliveries = useCallback(() => listWebhookDeliveries().then(setDeliveries, () => {}), [])
   useEffect(() => {
@@ -367,6 +385,8 @@ function Webhook() {
     })
 
   const dirty = hook ? url.trim() !== hook.url || enabled !== hook.enabled : !!url.trim()
+  const currentDeliveryPage = Math.min(deliveryPage, Math.max(0, Math.ceil(deliveries.length / deliveryPerPage) - 1))
+  const visibleDeliveries = deliveries.slice(currentDeliveryPage * deliveryPerPage, (currentDeliveryPage + 1) * deliveryPerPage)
 
   return (
     <section className="card pad dev-card">
@@ -452,7 +472,7 @@ function Webhook() {
                 </tr>
               </thead>
               <tbody>
-                {deliveries.map((d) => (
+                {visibleDeliveries.map((d) => (
                   <tr key={d.id}>
                     <td>
                       <code>{d.event}</code>
@@ -476,11 +496,49 @@ function Webhook() {
                 ))}
               </tbody>
             </table>
+            <DeveloperPagination
+              page={currentDeliveryPage}
+              perPage={deliveryPerPage}
+              total={deliveries.length}
+              onPageChange={setDeliveryPage}
+              onPerPageChange={(value) => {
+                setDeliveryPerPage(value)
+                setDeliveryPage(0)
+              }}
+            />
           </div>
         ) : (
           <p className="muted small">Nothing sent yet.</p>
         )}
       </div>
     </section>
+  )
+}
+
+function DeveloperPagination({ page, perPage, total, onPageChange, onPerPageChange }) {
+  const pageCount = Math.ceil(total / perPage)
+  const firstRow = page * perPage + 1
+  const lastRow = Math.min(total, (page + 1) * perPage)
+
+  return (
+    <div className="pagination">
+      Rows per page:
+      <select value={perPage} onChange={(e) => onPerPageChange(Number(e.target.value))} aria-label="Rows per page">
+        {[5, 10, 25, 50].map((size) => (
+          <option key={size} value={size}>
+            {size}
+          </option>
+        ))}
+      </select>
+      <span>
+        {firstRow}-{lastRow} of {total}
+      </span>
+      <button className="icon-btn" disabled={page === 0} onClick={() => onPageChange(page - 1)} aria-label="Previous page">
+        <Icon name="chevronLeft" size={16} />
+      </button>
+      <button className="icon-btn" disabled={page + 1 >= pageCount} onClick={() => onPageChange(page + 1)} aria-label="Next page">
+        <Icon name="chevronRight" size={16} />
+      </button>
+    </div>
   )
 }
