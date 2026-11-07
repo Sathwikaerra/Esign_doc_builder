@@ -62,7 +62,7 @@ export const DEFAULT_SIGNATORY_LABELS = {
 }
 
 // Colours used for signature boxes, one per participant.
-export const BOX_COLORS = ['#0f766e', '#7c3aed', '#d97706', '#2563eb', '#db2777', '#4d7c0f']
+export const BOX_COLORS = ['#315f9e', '#2854a3', '#3b6fb3', '#4f80c2', '#426aa8', '#254c82']
 
 export function emptyDraft() {
   return {

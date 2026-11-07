@@ -15,11 +15,11 @@ const ICONS = {
   AADHAAR_OTP: (
     <>
       <rect x="6" y="3" width="15" height="26" rx="3.5" fill="#4f46e5" />
-      <rect x="8" y="7" width="11" height="17" rx="1.5" fill="#eef2ff" />
+      <rect x="8" y="7" width="11" height="17" rx="1.5" fill="#eff6ff" />
       {[10, 13.5, 17].map((cx, i) => (
         <circle key={cx} cx={cx} cy="15.5" r="1.4" fill={['#22c55e', '#f59e0b', '#ef4444'][i]} />
       ))}
-      <rect x="11" y="26" width="5" height="1.4" rx="0.7" fill="#c7d2fe" />
+      <rect x="11" y="26" width="5" height="1.4" rx="0.7" fill="#dbeafe" />
       <Sun x={24} y={8} />
     </>
   ),
@@ -55,8 +55,8 @@ const ICONS = {
   ),
   CLICKWRAP: (
     <>
-      <circle cx="16" cy="16" r="12" fill="#3b82f6" />
-      <circle cx="16" cy="16" r="12" fill="none" stroke="#93c5fd" strokeWidth="2" />
+      <circle cx="16" cy="16" r="12" fill="#315f9e" />
+      <circle cx="16" cy="16" r="12" fill="none" stroke="#7ea6d8" strokeWidth="2" />
       <path d="M10.5 16.5l3.6 3.6 7.4-7.6" fill="none" stroke="#fff" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
     </>
   ),
@@ -65,7 +65,7 @@ const ICONS = {
       <path d="M3 22c3-6 5-10 7-10s-1 9 2 9 4-8 6-8-1 7 2 7 4-3 6-4" fill="none" stroke="#0d9488" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
       <rect x="3" y="26" width="26" height="1.6" rx="0.8" fill="#99f6e4" />
       <g transform="rotate(40 24 8)">
-        <rect x="21.5" y="1" width="5" height="12" rx="1.2" fill="#8b5cf6" />
+        <rect x="21.5" y="1" width="5" height="12" rx="1.2" fill="#4f80c2" />
         <path d="M21.5 13h5l-2.5 4z" fill="#f59e0b" />
       </g>
     </>

@@ -19,6 +19,7 @@ const RANGES = [
 ]
 
 const DAY = 24 * 60 * 60 * 1000
+const CONTRACT_PAGE_SIZES = [5, 10, 25, 50]
 
 function rangeBounds(range, custom) {
   const start = new Date()
@@ -63,6 +64,35 @@ function relative(date) {
   return diff >= 0 ? `in ${text}` : `${text} ago`
 }
 
+function matchesContractSearch(contract, searchTerm) {
+  if (!searchTerm) return true
+
+  const signers = signersOf(contract)
+  const signed = signers.filter((signer) => signer.signed).length
+  const reviewing = contract.status === 'incomplete' && inReview(contract)
+  const status = CONTRACT_STATUS[contract.status]?.label ?? contract.status
+  const completionDate = contract.completedAt || contract.expiresAt
+  const expiresOrCompleted =
+    contract.status === 'incomplete'
+      ? `Expires ${relative(contract.expiresAt)}`
+      : contract.completedAt
+        ? formatDateTime(contract.completedAt)
+        : formatDateTime(contract.expiresAt)
+  const values = [
+    contract.name,
+    contract.id,
+    ...contract.signers.map((signer) => `${signer.name} ${signer.kind === 'reviewer' ? 'reviewer' : 'signer'}`),
+    reviewing ? 'Waiting on review In review' : '',
+    `${signed}/${signers.length} signed`,
+    formatDateTime(contract.createdAt),
+    formatDateTime(completionDate),
+    expiresOrCompleted,
+    contract.estamping,
+    status,
+  ]
+  return values.some((value) => String(value ?? '').toLowerCase().includes(searchTerm))
+}
+
 const initials = (name) =>
   name
     .split(/\s+/)
@@ -99,6 +129,9 @@ export default function Dashboard() {
   const [showCustom, setShowCustom] = useState(false)
   const [sort, setSort] = useState({ key: 'createdAt', dir: -1 })
   const [statusFilter, setStatusFilter] = useState('incomplete')
+  const [contractPage, setContractPage] = useState(0)
+  const [contractsPerPage, setContractsPerPage] = useState(10)
+  const [contractSearch, setContractSearch] = useState('')
 
   useEffect(() => {
     listContracts()
@@ -122,8 +155,25 @@ export default function Dashboard() {
   const count = (status) => inRange.filter((c) => c.status === status).length
   // Reviewers' approvals are not signatures
   const signatures = inRange.flatMap((c) => c.signers.filter((s) => s.signed && s.kind !== 'reviewer'))
-  const listed = inRange.filter((c) => statusFilter === 'all' || c.status === statusFilter).sort((a, b) => SORTERS[sort.key](a, b) * sort.dir)
+  const searchTerm = contractSearch.trim().toLowerCase()
+  const listed = inRange
+    .filter((c) => statusFilter === 'all' || c.status === statusFilter)
+    .filter((c) => matchesContractSearch(c, searchTerm))
+    .sort((a, b) => SORTERS[sort.key](a, b) * sort.dir)
+  const pageCount = Math.ceil(listed.length / contractsPerPage)
+  const pageStart = contractPage * contractsPerPage
+  const visibleContracts = listed.slice(pageStart, pageStart + contractsPerPage)
+  const firstVisibleContract = listed.length ? pageStart + 1 : 0
+  const lastVisibleContract = Math.min(pageStart + contractsPerPage, listed.length)
   const toggleSort = (key) => setSort((s) => ({ key, dir: s.key === key ? -s.dir : 1 }))
+
+  useEffect(() => {
+    setContractPage(0)
+  }, [statusFilter, range, custom.from, custom.to, contractSearch, contractsPerPage])
+
+  useEffect(() => {
+    if (pageCount > 0 && contractPage >= pageCount) setContractPage(pageCount - 1)
+  }, [contractPage, pageCount])
 
   // What needs attention right now, across all contracts (not just the selected range)
   const open = (contracts ?? []).filter((c) => c.status === 'incomplete')
@@ -133,7 +183,7 @@ export default function Dashboard() {
 
   const spark = (pick) => (contracts ? dailyBuckets(contracts, bounds, pick) : [])
   const stats = [
-    { label: 'Total contracts', value: inRange.length, icon: 'contract', tone: 'violet', trend: spark(() => true) },
+    { label: 'Total contracts', value: inRange.length, icon: 'contract', tone: 'blue', trend: spark(() => true) },
     { label: 'In progress', value: count('incomplete'), icon: 'hourglass', tone: 'amber', trend: spark((c) => c.status === 'incomplete') },
     { label: 'Completed', value: count('completed'), icon: 'checkCircle', tone: 'green', trend: spark((c) => c.status === 'completed') },
     { label: 'Expired', value: count('expired'), icon: 'alert', tone: 'rose', trend: spark((c) => c.status === 'expired') },
@@ -256,7 +306,11 @@ export default function Dashboard() {
             <ul className="dx-legend">
               {statusSlices.map((s) => (
                 <li key={s.id}>
-                  <button className={statusFilter === s.id ? 'on' : ''} onClick={() => setStatusFilter(s.id)}>
+                  <button
+                    className={statusFilter === s.id ? 'on' : ''}
+                    onClick={() => setStatusFilter(s.id)}
+                    aria-pressed={statusFilter === s.id}
+                  >
                     <span className="dx-dot" style={{ background: s.color }} />
                     {s.label}
                     <strong>{s.value}</strong>
@@ -284,7 +338,7 @@ export default function Dashboard() {
                     <strong>{m.value}</strong>
                   </div>
                   <div className="dx-bar-track">
-                    <span style={{ width: `${(m.value / methodMax) * 100}%` }} />
+                    <span style={{ width: `${(m.value / methodMax) * 100}%`, opacity: m.value ? 1 : 0 }} />
                   </div>
                 </div>
               </li>
@@ -307,11 +361,25 @@ export default function Dashboard() {
           </div>
         </div>
 
+        <div className="dx-contracts-tools">
+          <label className="dx-contract-search">
+            <Icon name="search" size={16} />
+            <input
+              type="search"
+              value={contractSearch}
+              onChange={(event) => setContractSearch(event.target.value)}
+              placeholder="Search all columns"
+              aria-label="Search all contract columns"
+            />
+          </label>
+        </div>
+
         <div className="card dx-table">
           <div className="table-wrap">
             <table>
               <thead>
                 <tr>
+                  <th className="dx-serial">S.No</th>
                   <SortTh label="Contract" k="name" sort={sort} onSort={toggleSort} />
                   <th>People</th>
                   <th>Progress</th>
@@ -325,19 +393,66 @@ export default function Dashboard() {
                 {!contracts &&
                   [1, 2, 3].map((i) => (
                     <tr key={i} className="skeleton-row">
-                      {Array.from({ length: 7 }, (_, j) => (
+                      {Array.from({ length: 8 }, (_, j) => (
                         <td key={j}>
                           <span className="skeleton" />
                         </td>
                       ))}
                     </tr>
                   ))}
-                {listed.map((c) => (
-                  <ContractRow key={c.id} c={c} onOpen={() => navigate(`/contracts/${c.id}`)} />
+                {visibleContracts.map((c, index) => (
+                  <ContractRow
+                    key={c.id}
+                    c={c}
+                    serialNumber={pageStart + index + 1}
+                    onOpen={() => navigate(`/contracts/${c.id}`)}
+                  />
                 ))}
               </tbody>
             </table>
           </div>
+          {contracts && listed.length > 0 && (
+            <div className="dx-pagination">
+              <span className="dx-pagination-count">
+                Showing <strong>{firstVisibleContract}–{lastVisibleContract}</strong> of <strong>{listed.length}</strong> contracts
+              </span>
+              <div className="dx-pagination-controls">
+                <label className="dx-page-size">
+                  Rows per page
+                  <select
+                    value={contractsPerPage}
+                    onChange={(event) => setContractsPerPage(Number(event.target.value))}
+                    aria-label="Rows per page"
+                  >
+                    {CONTRACT_PAGE_SIZES.map((size) => (
+                      <option key={size} value={size}>{size}</option>
+                    ))}
+                  </select>
+                </label>
+                <button
+                  type="button"
+                  className="dx-pagination-button"
+                  disabled={contractPage === 0}
+                  onClick={() => setContractPage((page) => page - 1)}
+                  aria-label="Previous contracts page"
+                >
+                  Previous
+                </button>
+                <span className="dx-pagination-page">
+                  Page {contractPage + 1} of {pageCount}
+                </span>
+                <button
+                  type="button"
+                  className="dx-pagination-button"
+                  disabled={contractPage >= pageCount - 1}
+                  onClick={() => setContractPage((page) => page + 1)}
+                  aria-label="Next contracts page"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
           {contracts && listed.length === 0 && (
             <EmptyState
               title={statusFilter === 'all' ? 'No contracts' : `No ${CONTRACT_STATUS[statusFilter].label.toLowerCase()} contracts`}
@@ -350,7 +465,7 @@ export default function Dashboard() {
   )
 }
 
-function ContractRow({ c, onOpen }) {
+function ContractRow({ c, serialNumber, onOpen }) {
   const st = CONTRACT_STATUS[c.status] ?? { label: c.status, tone: 'grey' }
   const signers = signersOf(c)
   const signed = signers.filter((s) => s.signed).length
@@ -359,13 +474,11 @@ function ContractRow({ c, onOpen }) {
   const urgent = c.status === 'incomplete' && new Date(c.expiresAt) - Date.now() < 3 * DAY
   return (
     <tr className="row-link" style={{ '--c': STATUS_COLORS[c.status] ?? '#94a3b8' }} onClick={onOpen}>
+      <td className="dx-serial">{serialNumber}</td>
       <td>
         <div className="dx-cell-name">
           <span className="dx-dot" />
-          <div>
-            <strong>{c.name}</strong>
-            <span className="muted small mono">{c.id.slice(0, 12)}…</span>
-          </div>
+          <strong>{c.name}</strong>
         </div>
       </td>
       <td>
@@ -421,32 +534,32 @@ function Sparkline({ values }) {
 }
 
 function Donut({ slices, total }) {
-  const r = 52
+  const radius = 52
   let offset = 0
   return (
     <div className="dx-donut">
       <svg viewBox="0 0 140 140" aria-hidden="true">
-        <circle cx="70" cy="70" r={r} className="dx-donut-track" />
+        <circle cx="70" cy="70" r={radius} className="dx-donut-track" />
         {total > 0 &&
           slices
-            .filter((s) => s.value)
-            .map((s) => {
-              const pct = (s.value / total) * 100
-              const el = (
+            .filter((slice) => slice.value > 0)
+            .map((slice) => {
+              const percentage = (slice.value / total) * 100
+              const segment = (
                 <circle
-                  key={s.id}
+                  key={slice.id}
                   cx="70"
                   cy="70"
-                  r={r}
+                  r={radius}
                   pathLength="100"
-                  stroke={s.color}
-                  strokeDasharray={`${Math.max(0, pct - 1)} ${100 - Math.max(0, pct - 1)}`}
+                  stroke={slice.color}
+                  strokeDasharray={`${Math.max(0, percentage - 1)} ${100 - Math.max(0, percentage - 1)}`}
                   strokeDashoffset={-offset}
                   className="dx-donut-slice"
                 />
               )
-              offset += pct
-              return el
+              offset += percentage
+              return segment
             })}
       </svg>
       <div className="dx-donut-center">

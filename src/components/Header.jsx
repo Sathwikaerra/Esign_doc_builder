@@ -4,7 +4,6 @@ import { useAuth } from '../context/AuthContext'
 import useSessionTimeout from '../hooks/useSessionTimeout'
 import { listDownloads } from '../services/downloadService'
 import { downloadJson, formatDateTime } from '../utils/format'
-import { THEMES, applyTheme, getTheme } from '../utils/theme'
 import Icon from './ui/Icon'
 import { Drawer } from './ui/Overlay'
 import { CopyButton, EmptyState } from './ui/Controls'
@@ -18,25 +17,17 @@ export default function Header({ onToggleSidebar }) {
   const org = user?.organisation ?? { id: '', name: 'My Organisation' }
   const navigate = useNavigate()
   const toast = useToast()
-  const [panel, setPanel] = useState(null) // 'org' | 'downloads' | 'user' | 'theme'
+  const [panel, setPanel] = useState(null) // 'org' | 'downloads' | 'user'
   const [downloads, setDownloads] = useState([])
-  const [theme, setTheme] = useState(getTheme)
-  const themeRef = useRef(null)
   const userRef = useRef(null)
 
-  // Dropdown menus close on any click outside them
+  // The account menu closes on any click outside it.
   useEffect(() => {
-    if (panel !== 'theme' && panel !== 'user') return
-    const ref = panel === 'theme' ? themeRef : userRef
-    const close = (e) => !ref.current?.contains(e.target) && setPanel(null)
+    if (panel !== 'user') return
+    const close = (e) => !userRef.current?.contains(e.target) && setPanel(null)
     document.addEventListener('mousedown', close)
     return () => document.removeEventListener('mousedown', close)
   }, [panel])
-
-  const chooseTheme = (id) => {
-    applyTheme(id)
-    setTheme(id)
-  }
 
   const remaining = useSessionTimeout(SESSION_SECONDS, () => {
     logout()
@@ -64,9 +55,14 @@ export default function Header({ onToggleSidebar }) {
 
   return (
     <header className="app-header">
-      <button className="icon-btn menu-toggle" onClick={onToggleSidebar} aria-label="Toggle menu">
-        <Icon name="menu" />
-      </button>
+      <div className="header-left">
+        <button className="icon-btn menu-toggle" onClick={onToggleSidebar} aria-label="Toggle menu">
+          <Icon name="menu" />
+        </button>
+        <div className="header-brand" aria-label="Esign Builder">
+          <span>Esign</span> <strong>Builder</strong>
+        </div>
+      </div>
 
       <div className="header-right">
         <button className="org-btn" onClick={() => setPanel('org')}>
@@ -74,7 +70,7 @@ export default function Header({ onToggleSidebar }) {
           <Icon name="chevronDown" size={16} />
         </button>
 
-        <div className={`session-timer ${remaining < 120 ? 'warn' : ''}`} title="Session ends after inactivity">
+        {/* <div className={`session-timer ${remaining < 120 ? 'warn' : ''}`} title="Session ends after inactivity">
           <Icon name="clock" size={16} />
           <div>
             <strong>
@@ -82,26 +78,7 @@ export default function Header({ onToggleSidebar }) {
             </strong>
             <span>until timeout</span>
           </div>
-        </div>
-
-        <div className="theme-wrap" ref={themeRef}>
-          <button className="icon-btn" onClick={() => setPanel(panel === 'theme' ? null : 'theme')} aria-label="Change theme" title="Change theme">
-            <Icon name="palette" />
-          </button>
-          {panel === 'theme' && (
-            <div className="theme-menu">
-              <p>Theme</p>
-              {THEMES.map((t) => (
-                <button key={t.id} className={`theme-option ${theme === t.id ? 'on' : ''}`} onClick={() => chooseTheme(t.id)}>
-                  <span className="swatch" style={{ background: `linear-gradient(135deg, ${t.swatch[0]}, ${t.swatch[1]})` }} />
-                  {t.label}
-                  {t.dark && <span className="chip">Dark</span>}
-                  {theme === t.id && <Icon name="check" size={16} className="check" />}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+        </div> */}
 
         <button className="icon-btn" onClick={openDownloads} aria-label="Downloads" title="Downloads">
           <Icon name="download" />

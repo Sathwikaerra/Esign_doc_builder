@@ -1,13 +1,5 @@
 import { NavLink } from 'react-router-dom'
-import {
-  LayoutDashboard,
-  GitBranch,
-  LayoutTemplate,
-  Code2,
-  FileSignature,
-  ChevronLeft,
-  ChevronRight,
-} from 'lucide-react'
+import { LayoutDashboard, GitBranch, LayoutTemplate, Code2, Menu } from 'lucide-react'
 import './Sidebar.css'
 
 // Add more entries here as new screens are built.
@@ -21,21 +13,13 @@ const MENU_ITEMS = [
 export default function Sidebar({ expanded, onToggleExpanded, mobileOpen, onNavigate }) {
   return (
     <aside className={`sidebar ${expanded ? 'expanded' : ''} ${mobileOpen ? 'mobile-open' : ''}`}>
-      <div className="sidebar-logo">
-        <span className="logo-mark">
-          <FileSignature size={20} strokeWidth={2} />
-        </span>
-        <span className="nav-label brand">
-          eSign <b>Builder</b>
-        </span>
-      </div>
-
       <button
         className="sidebar-expand"
         onClick={onToggleExpanded}
-        aria-label={expanded ? 'Collapse menu' : 'Expand menu'}
+        aria-label={expanded ? 'Collapse sidebar' : 'Expand sidebar'}
+        title={expanded ? 'Collapse sidebar' : 'Expand sidebar'}
       >
-        {expanded ? <ChevronLeft size={14} /> : <ChevronRight size={14} />}
+        <Menu size={20} />
       </button>
 
       <p className="nav-section nav-label">Menu</p>

@@ -4,12 +4,10 @@ import { BrowserRouter } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
 import { ToastProvider } from './components/ui/Toast'
 import App from './App'
-import { applyTheme, getTheme } from './utils/theme'
-import { initTilt } from './utils/tilt'
+import { applyTheme } from './utils/theme'
 import './index.css'
 
-applyTheme(getTheme())
-initTilt()
+applyTheme()
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
